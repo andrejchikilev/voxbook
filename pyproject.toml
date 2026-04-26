@@ -21,9 +21,10 @@ voxbook = "voxbook.cli:app"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+fix = true
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]  # ошибки, баги, импорты
+select = ["E", "F", "I"]  # E: pycodestyle errors, F: pyflakes errors, I: isort import issues
 ignore = []
 
 [tool.ruff.format]
