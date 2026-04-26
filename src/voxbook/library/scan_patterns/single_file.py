@@ -15,8 +15,10 @@ class SingleFilePattern:
         if path.suffix.lower() not in AUDIO_EXTS:
             return []
 
-        return [ScannedBook(
-            title=path.stem,
-            path=path,
-            files=[path],
-        )]
+        return [
+            ScannedBook(
+                title=path.stem,
+                path=path,
+                files=[path],
+            )
+        ]

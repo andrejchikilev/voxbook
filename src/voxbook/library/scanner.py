@@ -47,9 +47,7 @@ def match_books(path: Path, patterns: list[ScanPattern]) -> list[ScannedBook]:
 
 
 def save_scanned_book(session: Session, scanned_book: ScannedBook) -> None:
-    book = session.exec(
-        select(Book).where(Book.path == str(scanned_book.path))
-    ).first()
+    book = session.exec(select(Book).where(Book.path == str(scanned_book.path))).first()
 
     if book is None:
         book = Book(
@@ -65,9 +63,7 @@ def save_scanned_book(session: Session, scanned_book: ScannedBook) -> None:
     current_paths = {str(file) for file in scanned_book.files}
 
     for index, file in enumerate(scanned_book.files, start=1):
-        existing_file = session.exec(
-            select(BookFile).where(BookFile.path == str(file))
-        ).first()
+        existing_file = session.exec(select(BookFile).where(BookFile.path == str(file))).first()
 
         if existing_file is None:
             session.add(

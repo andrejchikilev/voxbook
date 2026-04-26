@@ -3,6 +3,7 @@ from pathlib import Path
 from natsort import natsorted
 
 from voxbook.library.scan_patterns.base import ScannedBook
+from voxbook.library.scan_patterns.helpers import create_scanned_book
 
 AUDIO_EXTS = {".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".opus"}
 
@@ -23,11 +24,4 @@ class FlatBookFolderPattern:
             key=lambda p: p.name,
         )
 
-        if not audio_files:
-            return []
-
-        return [ScannedBook(
-            title=path.name,
-            path=path,
-            files=audio_files,
-        )]
+        return create_scanned_book(path, audio_files)
