@@ -260,8 +260,8 @@ def reset_db(force: bool = typer.Option(False, "--force", "-f")) -> None:
     console.print("[red]Database deleted[/red]")
 
 
-@app.command()
-def files(book_id: int) -> None:
+@app.command("files")
+def list_files(book_id: int) -> None:
     with Session(engine) as session:
         book = session.get(Book, book_id)
 

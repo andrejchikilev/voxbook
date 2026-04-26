@@ -1,0 +1,17 @@
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-positional-arguments,
+    too-many-branches,
+    too-many-statements,
+    broad-exception-caught
+
+[FORMAT]
+max-line-length=100
+
+[R0902]
+max-attributes=20

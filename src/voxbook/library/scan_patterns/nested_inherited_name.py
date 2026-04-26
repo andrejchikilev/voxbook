@@ -1,6 +1,6 @@
-from pathlib import Path
 import re
 import unicodedata
+from pathlib import Path
 
 from natsort import natsorted
 
@@ -18,11 +18,7 @@ class NestedInheritedNamePattern(BasePattern):
 
         for book_dir in self._find_matching_book_dirs(path):
             audio_files = natsorted(
-                (
-                    file
-                    for file in book_dir.iterdir()
-                    if self.is_audio_file(file)
-                ),
+                (file for file in book_dir.iterdir() if self.is_audio_file(file)),
                 key=lambda p: p.name,
             )
 
@@ -46,11 +42,7 @@ class NestedInheritedNamePattern(BasePattern):
             if not candidate.is_dir():
                 continue
 
-            audio_files = [
-                file
-                for file in candidate.iterdir()
-                if self.is_audio_file(file)
-            ]
+            audio_files = [file for file in candidate.iterdir() if self.is_audio_file(file)]
 
             if not audio_files:
                 continue

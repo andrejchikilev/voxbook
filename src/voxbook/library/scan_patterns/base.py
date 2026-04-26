@@ -13,8 +13,7 @@ class ScannedBook:
 class ScanPattern(Protocol):
     name: str
 
-    def match(self, path: Path) -> list[ScannedBook]:
-        ...
+    def match(self, path: Path) -> list[ScannedBook]: ...
 
 
 class BasePattern:
