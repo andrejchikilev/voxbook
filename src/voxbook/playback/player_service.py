@@ -4,12 +4,14 @@ from pathlib import Path
 
 from voxbook.library.models import BookFile
 from voxbook.playback.context import PlaybackContext
+from voxbook.playback.exceptions import AudioFileValidationError
 from voxbook.playback.keyboard_controller import KeyboardController
 from voxbook.playback.mpv_controller import MpvController
 from voxbook.playback.player_actions import PlayerActions
 from voxbook.playback.repository import PlaybackRepository
 from voxbook.playback.status_renderer import StatusRenderer
 from voxbook.playback.types import LogFn, PlaybackResult
+from voxbook.playback.validation import validate_audio_file
 
 
 class PlayerService:
@@ -106,6 +108,19 @@ class PlayerService:
         file_path: Path,
         start_position: float = 0.0,
     ) -> PlaybackResult:
+        try:
+            validate_audio_file(file_path)
+        except AudioFileValidationError as error:
+            self.log(f"[red]Skipping file[/red] {file_index}: {file_path} ({error})")
+
+            self.playback_repository.save_position(
+                book_id,
+                file_index + 1,
+                0.0,
+                speed=self.context.playback_speed,
+            )
+
+            return "next"
         player = self.mpv.create_player()
 
         completed = False
