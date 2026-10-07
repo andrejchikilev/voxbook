@@ -14,5 +14,8 @@ wheels/
 .vscode/
 .idea/
 *.sublime-project
-*.sublime-workspace 
+*.sublime-workspace
 .ruff_cache/
+
+# Local auxiliary documents
+local-docs/
