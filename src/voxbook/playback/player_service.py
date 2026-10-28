@@ -101,6 +101,19 @@ class PlayerService:
             else:
                 break
 
+    def get_volume(self) -> float | None:
+        player = self.context.current_player
+        if player is None:
+            return None
+        return self.mpv.get_volume(player)
+
+    def set_volume(self, level: float) -> None:
+        level = max(0.0, min(100.0, level))
+        player = self.context.current_player
+        if player is None:
+            return
+        self.mpv.set_volume(player, level)
+
     def _play_single_book_file(
         self,
         book_id: int,
