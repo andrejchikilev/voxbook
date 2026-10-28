@@ -54,6 +54,18 @@ class MpvController:
         except Exception:
             pass
 
+    def get_volume(self, player: MPV) -> float | None:
+        try:
+            return player.volume
+        except Exception:
+            return None
+
+    def set_volume(self, player: MPV, level: float) -> None:
+        try:
+            player.volume = level
+        except Exception:
+            pass
+
     def quit(self, player: MPV) -> None:
         try:
             player.quit()
