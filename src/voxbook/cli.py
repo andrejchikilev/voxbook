@@ -4,6 +4,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
+from sqlalchemy import or_
 from sqlmodel import Session, select
 
 from voxbook.helpers import book_position_to_file_position, format_seconds, parse_timestamp
@@ -125,9 +126,19 @@ def roots(
 
 @app.command()
 def search(query: str) -> None:
+    pattern = f"%{query}%"
+
     with Session(engine) as session:
         books = session.exec(
-            select(Book).where(Book.title.ilike(f"%{query}%")).order_by(Book.title)
+            select(Book)
+            .where(
+                or_(
+                    Book.title.ilike(pattern),
+                    Book.author.ilike(pattern),
+                    Book.series.ilike(pattern),
+                )
+            )
+            .order_by(Book.title)
         ).all()
 
     if not books:
@@ -135,7 +146,9 @@ def search(query: str) -> None:
         return
 
     for book in books:
-        console.print(f"{book.id}: {escape(book.title)}")
+        author = book.author or "Unknown"
+        series_part = f" ({book.series})" if book.series else ""
+        console.print(f"{book.id}: {escape(author)} — {escape(book.title)}{escape(series_part)}")
 
 
 @app.command("list")
@@ -150,6 +163,7 @@ def list_books() -> None:
         table = Table(title="Library")
         table.add_column("ID", justify="right")
         table.add_column("Title")
+        table.add_column("Author")
         table.add_column("Progress")
         table.add_column("Position")
 
@@ -183,6 +197,7 @@ def list_books() -> None:
             table.add_row(
                 str(book.id),
                 escape(book.title),
+                escape(book.author or "—"),
                 progress_text,
                 position_text,
             )
@@ -308,6 +323,49 @@ def delete_bookmark_command(
     else:
         console.print("[red]Bookmark not found[/red]")
         raise typer.Exit(code=1)
+
+
+@app.command("book-info")
+def book_info(book_id: int) -> None:
+    with Session(engine) as session:
+        book = session.get(Book, book_id)
+
+        if book is None:
+            console.print("[red]Book not found[/red]")
+            raise typer.Exit(code=1)
+
+    console.print(f"[green]Book:[/green] {escape(book.title)}")
+    console.print(f"[green]Author:[/green] {escape(book.author or '—')}")
+    console.print(f"[green]Series:[/green] {escape(book.series or '—')}")
+    console.print(f"[green]Narrator:[/green] {escape(book.narrator or '—')}")
+    console.print(f"[green]Path:[/green] {escape(book.path)}")
+
+
+@app.command("set-book")
+def set_book(
+    book_id: int,
+    author: str | None = typer.Option(None, "--author"),
+    series: str | None = typer.Option(None, "--series"),
+    narrator: str | None = typer.Option(None, "--narrator"),
+) -> None:
+    with Session(engine) as session:
+        book = session.get(Book, book_id)
+
+        if book is None:
+            console.print("[red]Book not found[/red]")
+            raise typer.Exit(code=1)
+
+        if author is not None:
+            book.author = author
+        if series is not None:
+            book.series = series
+        if narrator is not None:
+            book.narrator = narrator
+
+        session.add(book)
+        session.commit()
+
+    console.print(f"[green]Updated book {book_id}[/green]")
 
 
 @app.command("set-speed")
