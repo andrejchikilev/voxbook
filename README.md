@@ -142,6 +142,8 @@ Supported variables:
 | `speed_min` | `VOXBOOK_SPEED_MIN` | `0.5` |
 | `speed_max` | `VOXBOOK_SPEED_MAX` | `3.0` |
 
+`mpv_path` is the path or command name of the `mpv` binary. VoxBook checks that the file exists or is available on `PATH` before playback and logs a warning if it cannot be found. This value is not passed to mpv as an option.
+
 ## ⚙️ Storage
 
 SQLite DB:
