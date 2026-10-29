@@ -348,6 +348,30 @@ def status(book_id: int) -> None:
     console.print(f"[green]Speed:[/green] {state.speed:.1f}x")
 
 
+@app.command()
+def volume(
+    level: float | None = typer.Argument(None, min=0.0, max=100.0),
+) -> None:
+    player_service = PlayerService()
+
+    if level is None:
+        current_volume = player_service.get_volume()
+
+        if current_volume is None:
+            console.print("[yellow]No active player[/yellow]")
+            raise typer.Exit(code=1)
+
+        console.print(f"[green]Volume:[/green] {current_volume:.0f}")
+        return
+
+    if player_service.get_volume() is None:
+        console.print("[yellow]No active player[/yellow]")
+        raise typer.Exit(code=1)
+
+    player_service.set_volume(level)
+    console.print(f"[green]Volume set:[/green] {level:.0f}")
+
+
 @app.command("reset-progress")
 def reset_progress(
     book_id: int,

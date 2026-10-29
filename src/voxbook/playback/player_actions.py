@@ -99,6 +99,12 @@ class PlayerActions:
     def speed_reset(self) -> None:
         self.set_speed(1.0)
 
+    def volume_up(self) -> None:
+        self.set_volume(min(100.0, self.context.playback_volume + 5.0))
+
+    def volume_down(self) -> None:
+        self.set_volume(max(0.0, self.context.playback_volume - 5.0))
+
     def set_speed(self, speed: float) -> None:
         player = self._get_current_player()
 
@@ -108,6 +114,16 @@ class PlayerActions:
             self.mpv.set_speed(player, speed)
 
         self.log(f"Speed: {speed:.1f}x")
+
+    def set_volume(self, volume: float) -> None:
+        player = self._get_current_player()
+
+        self.context.playback_volume = volume
+
+        if player is not None:
+            self.mpv.set_volume(player, volume)
+
+        self.log(f"Volume: {volume:.0f}")
 
     def _get_current_player(self) -> MPV | None:
         with self.context.player_lock:

@@ -8,4 +8,5 @@ class BookPlaybackState(SQLModel, table=True):
     file_index: int = 1
     position: float = 0.0
     speed: float = 1.0
+    volume: float = 100.0
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

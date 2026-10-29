@@ -55,6 +55,8 @@ class PlayerService:
             on_speed_up=self.actions.speed_up,
             on_speed_down=self.actions.speed_down,
             on_speed_reset=self.actions.speed_reset,
+            on_volume_up=self.actions.volume_up,
+            on_volume_down=self.actions.volume_down,
         )
 
     def play_book(self, book_id: int, files: list[BookFile], book_title: str) -> None:
@@ -74,6 +76,7 @@ class PlayerService:
 
         state = self.playback_repository.load_position(book_id)
         self.context.playback_speed = state.speed if state else 1.0
+        self.context.playback_volume = state.volume if state else 100.0
         start_index = state.file_index if state else 1
         start_position = state.position if state else 0.0
 
@@ -101,6 +104,19 @@ class PlayerService:
             else:
                 break
 
+    def get_volume(self) -> float | None:
+        player = self.context.current_player
+        if player is None:
+            return None
+        return self.mpv.get_volume(player)
+
+    def set_volume(self, level: float) -> None:
+        level = max(0.0, min(100.0, level))
+        player = self.context.current_player
+        if player is None:
+            return
+        self.mpv.set_volume(player, level)
+
     def _play_single_book_file(
         self,
         book_id: int,
@@ -118,6 +134,7 @@ class PlayerService:
                 file_index + 1,
                 0.0,
                 speed=self.context.playback_speed,
+                volume=self.context.playback_volume,
             )
 
             return "next"
@@ -142,6 +159,7 @@ class PlayerService:
             player.play(str(file_path))
             self.mpv.wait_until_loaded(player)
             self.mpv.set_speed(player, self.context.playback_speed)
+            self.mpv.set_volume(player, self.context.playback_volume)
 
             if start_position:
                 self.log(f"Resuming from {start_position:.2f} seconds...")
@@ -160,7 +178,11 @@ class PlayerService:
                 if self.context.skip_to_next:
                     result = "next"
                     self.playback_repository.save_position(
-                        book_id, file_index + 1, 0.0, speed=self.context.playback_speed
+                        book_id,
+                        file_index + 1,
+                        0.0,
+                        speed=self.context.playback_speed,
+                        volume=self.context.playback_volume,
                     )
                     break
 
@@ -168,7 +190,11 @@ class PlayerService:
                     result = "previous"
                     previous_index = max(1, file_index - 1)
                     self.playback_repository.save_position(
-                        book_id, previous_index, 0.0, speed=self.context.playback_speed
+                        book_id,
+                        previous_index,
+                        0.0,
+                        speed=self.context.playback_speed,
+                        volume=self.context.playback_volume,
                     )
                     break
 
@@ -176,14 +202,22 @@ class PlayerService:
                 if pos is not None:
                     self.context.last_position = pos
                     self.playback_repository.save_position(
-                        book_id, file_index, pos, speed=self.context.playback_speed
+                        book_id,
+                        file_index,
+                        pos,
+                        speed=self.context.playback_speed,
+                        volume=self.context.playback_volume,
                     )
 
                 if self.mpv.is_idle(player):
                     completed = True
                     result = "completed"
                     self.playback_repository.save_position(
-                        book_id, file_index + 1, 0.0, speed=self.context.playback_speed
+                        book_id,
+                        file_index + 1,
+                        0.0,
+                        speed=self.context.playback_speed,
+                        volume=self.context.playback_volume,
                     )
                     break
 
@@ -199,6 +233,7 @@ class PlayerService:
                     file_index,
                     self.context.last_position,
                     speed=self.context.playback_speed,
+                    volume=self.context.playback_volume,
                 )
 
             with self.context.player_lock:
