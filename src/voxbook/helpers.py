@@ -1,4 +1,7 @@
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from voxbook.library.models import BookFile
 
 
 class _HasDurationAndIndex(Protocol):
@@ -36,7 +39,7 @@ def parse_timestamp(timestamp: str) -> float:
 
 
 def book_position_to_file_position(
-    files: list[_HasDurationAndIndex],
+    files: list[_HasDurationAndIndex] | list["BookFile"],
     book_position: float,
 ) -> tuple[int, float]:
     if not files:

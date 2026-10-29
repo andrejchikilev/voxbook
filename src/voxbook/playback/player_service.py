@@ -2,6 +2,7 @@ import threading
 import time
 from pathlib import Path
 
+from voxbook.helpers import book_position_to_file_position
 from voxbook.library.models import BookFile
 from voxbook.playback.context import PlaybackContext
 from voxbook.playback.exceptions import AudioFileValidationError
@@ -39,6 +40,7 @@ class PlayerService:
             log=self.log,
             mpv=self.mpv,
             status_renderer=self.status_renderer,
+            playback_repository=self.playback_repository,
         )
 
         # 4. And only then keyboard
@@ -89,6 +91,11 @@ class PlayerService:
                 file_path=Path(book_file.path),
                 start_position=start_position,
             )
+
+            if result == "jump":
+                current_index, start_position = self._resolve_jump_target(files, files_by_index)
+                self._save_jump_position(book_id, current_index, start_position)
+                continue
 
             if result in {"completed", "next"}:
                 start_position = 0.0
@@ -158,10 +165,11 @@ class PlayerService:
                 )
 
                 if self.context.skip_to_next:
-                    result = "next"
-                    self.playback_repository.save_position(
-                        book_id, file_index + 1, 0.0, speed=self.context.playback_speed
-                    )
+                    result = "jump" if self._has_jump_target() else "next"
+                    if result == "next":
+                        self.playback_repository.save_position(
+                            book_id, file_index + 1, 0.0, speed=self.context.playback_speed
+                        )
                     break
 
                 if self.context.skip_to_previous:
@@ -212,3 +220,49 @@ class PlayerService:
                 pass
 
         return result
+
+    def _resolve_jump_target(
+        self,
+        files: list[BookFile],
+        files_by_index: dict[int, BookFile],
+    ) -> tuple[int, float]:
+        jump_index = self.context.jump_target_index
+        jump_position = self.context.jump_target_position
+
+        self.context.jump_target_index = None
+        self.context.jump_target_position = 0.0
+
+        if jump_index is not None and jump_index in files_by_index:
+            return jump_index, 0.0
+
+        return book_position_to_file_position(files, jump_position)
+
+    def _has_jump_target(self) -> bool:
+        return (
+            self.context.jump_target_index is not None
+            or self.context.jump_target_position > 0.0
+        )
+
+    def _save_jump_position(
+        self,
+        book_id: int,
+        file_index: int,
+        position: float,
+    ) -> None:
+        self.context.last_position = position
+        self.context.current_file_index = file_index
+        self.playback_repository.save_position(
+            book_id,
+            file_index,
+            position,
+            speed=self.context.playback_speed,
+        )
+
+    def jump_to_position(self, book_position: float) -> None:
+        self.actions.jump_to_position(book_position)
+
+    def jump_to_file(self, file_index: int, position: float = 0.0) -> None:
+        self.actions.jump_to_file(file_index, position)
+
+    def jump_to_bookmark(self, bookmark_id: int) -> None:
+        self.actions.jump_to_bookmark(bookmark_id)
