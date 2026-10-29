@@ -4,13 +4,25 @@ from natsort import natsorted
 from sqlmodel import Session, select
 
 from voxbook.library.helpers import get_audio_duration
-from voxbook.library.models import Book, BookFile
+from voxbook.library.models import Book, BookFile, LibraryRoot
 from voxbook.library.scan_patterns.base import ScannedBook, ScanPattern
 from voxbook.library.scan_patterns.book_folder_with_parts import BookFolderWithPartsPattern
 from voxbook.library.scan_patterns.flat_book_folder import FlatBookFolderPattern
 from voxbook.library.scan_patterns.nested_inherited_name import NestedInheritedNamePattern
 from voxbook.library.scan_patterns.single_file import SingleFilePattern
 from voxbook.storage.db import engine
+
+
+def _normalize_root(path: Path) -> Path:
+    return path.expanduser().resolve()
+
+
+def save_library_root(session: Session, root_path: Path) -> None:
+    normalized = _normalize_root(root_path)
+    existing = session.exec(select(LibraryRoot).where(LibraryRoot.path == str(normalized))).first()
+
+    if existing is None:
+        session.add(LibraryRoot(path=str(normalized)))
 
 
 def scan_library(library_root: Path) -> None:
@@ -27,6 +39,8 @@ def scan_library(library_root: Path) -> None:
     ]
 
     with Session(engine) as session:
+        save_library_root(session, library_root)
+
         for entry in natsorted(library_root.iterdir(), key=lambda p: p.name):
             scanned_books = match_books(entry, patterns)
 
