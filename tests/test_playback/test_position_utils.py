@@ -18,7 +18,7 @@ def test_book_position_to_file_position_inside_first_file() -> None:
 
 def test_book_position_to_file_position_at_file_boundary() -> None:
     files = [make_file(1, 100), make_file(2, 100)]
-    assert book_position_to_file_position(files, 100.0) == (2, 0.0)
+    assert book_position_to_file_position(files, 100.0) == (1, 100.0)
 
 
 def test_book_position_to_file_position_inside_second_file() -> None:

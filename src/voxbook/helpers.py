@@ -51,7 +51,7 @@ def book_position_to_file_position(
         file_start = elapsed
         file_end = elapsed + book_file.duration
 
-        if book_position < file_end:
+        if book_position <= file_end:
             position_in_file = max(0.0, book_position - file_start)
             return (book_file.index, position_in_file)
 

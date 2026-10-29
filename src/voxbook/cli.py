@@ -6,7 +6,7 @@ from rich.markup import escape
 from rich.table import Table
 from sqlmodel import Session, select
 
-from voxbook.helpers import format_seconds
+from voxbook.helpers import book_position_to_file_position, format_seconds, parse_timestamp
 from voxbook.library.models import Book, BookFile
 from voxbook.library.repository import delete_bookmark, get_bookmark, list_bookmarks
 from voxbook.library.scanner import scan_library
@@ -44,7 +44,8 @@ def play(book_id: int) -> None:
     console.print(f"[green]Playing:[/green] {escape(book.title)}")
     console.print(
         "[dim]space: pause/play | ←/→: seek | n/p: next/prev file | "
-        "</>: speed | =: normal speed | s: status | b: bookmark | q: quit[/dim]"
+        "</>: speed | =: normal speed | s: status | b: bookmark | "
+        "g: goto time | j/k: goto file/bookmark | q: quit[/dim]"
     )
 
     player_service = PlayerService(
@@ -156,6 +157,46 @@ def bookmarks(book_id: int) -> None:
 
     for item in items:
         console.print(f"{item.id}: file={item.file_index} | pos={format_seconds(item.position)}")
+
+
+@app.command()
+def goto(book_id: int, position: str) -> None:
+    with Session(engine) as session:
+        book = session.get(Book, book_id)
+
+        if book is None:
+            console.print("[red]Book not found[/red]")
+            raise typer.Exit(code=1)
+
+        book_files = session.exec(
+            select(BookFile).where(BookFile.book_id == book_id).order_by(BookFile.index)
+        ).all()
+
+    if not book_files:
+        console.print("[red]Book has no files[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        book_position = parse_timestamp(position)
+    except ValueError as error:
+        console.print(f"[red]Invalid position: {error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    file_index, file_position = book_position_to_file_position(list(book_files), book_position)
+
+    playback_repository.save_position(
+        book_id=book_id,
+        file_index=file_index,
+        position=file_position,
+        speed=1.0,
+    )
+
+    console.print(
+        f"[green]Goto:[/green] {format_seconds(book_position)} "
+        f"(file {file_index}, pos {format_seconds(file_position)})"
+    )
+
+    play(book_id)
 
 
 @app.command("goto-bookmark")
