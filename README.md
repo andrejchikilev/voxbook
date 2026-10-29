@@ -115,6 +115,33 @@ voxbook reset-progress <book_id>
 
 ---
 
+## ⚙️ Configuration
+
+VoxBook reads settings from `~/.config/voxbook/config.toml` (flat keys, no nested tables).
+Environment variables with the `VOXBOOK_` prefix override TOML values.
+
+Example `~/.config/voxbook/config.toml`:
+
+```toml
+db_path = "~/.local/share/voxbook/voxbook.db"
+mpv_path = "mpv"
+seek_step_seconds = 30
+speed_step = 0.1
+speed_min = 0.5
+speed_max = 3.0
+```
+
+Supported variables:
+
+| TOML key | Environment variable | Default |
+|----------|----------------------|---------|
+| `db_path` | `VOXBOOK_DB_PATH` | `~/.local/share/voxbook/voxbook.db` |
+| `mpv_path` | `VOXBOOK_MPV_PATH` | `mpv` |
+| `seek_step_seconds` | `VOXBOOK_SEEK_STEP_SECONDS` | `30` |
+| `speed_step` | `VOXBOOK_SPEED_STEP` | `0.1` |
+| `speed_min` | `VOXBOOK_SPEED_MIN` | `0.5` |
+| `speed_max` | `VOXBOOK_SPEED_MAX` | `3.0` |
+
 ## ⚙️ Storage
 
 SQLite DB:

@@ -2,6 +2,8 @@ import threading
 import time
 from pathlib import Path
 
+from voxbook.config import AppConfig, load_config
+from voxbook.helpers import book_position_to_file_position
 from voxbook.library.models import BookFile
 from voxbook.playback.context import PlaybackContext
 from voxbook.playback.exceptions import AudioFileValidationError
@@ -22,14 +24,16 @@ class PlayerService:
         mpv: MpvController | None = None,
         status_renderer: StatusRenderer | None = None,
         playback_repository: PlaybackRepository | None = None,
+        config: AppConfig | None = None,
     ) -> None:
         self.log = log or (lambda message: None)
+        self.config = config or load_config()
 
         # 1. Base state
         self.context = context or PlaybackContext()
 
         # 2. Then controllers that depend on the state
-        self.mpv = mpv or MpvController()
+        self.mpv = mpv or MpvController(config=self.config)
         self.status_renderer = status_renderer or StatusRenderer(log=self.log, mpv=self.mpv)
         self.playback_repository = playback_repository or PlaybackRepository()
 
@@ -39,6 +43,8 @@ class PlayerService:
             log=self.log,
             mpv=self.mpv,
             status_renderer=self.status_renderer,
+            config=self.config,
+            playback_repository=self.playback_repository,
         )
 
         # 4. And only then keyboard
@@ -55,6 +61,8 @@ class PlayerService:
             on_speed_up=self.actions.speed_up,
             on_speed_down=self.actions.speed_down,
             on_speed_reset=self.actions.speed_reset,
+            on_volume_up=self.actions.volume_up,
+            on_volume_down=self.actions.volume_down,
         )
 
     def play_book(self, book_id: int, files: list[BookFile], book_title: str) -> None:
@@ -74,6 +82,7 @@ class PlayerService:
 
         state = self.playback_repository.load_position(book_id)
         self.context.playback_speed = state.speed if state else 1.0
+        self.context.playback_volume = state.volume if state else 100.0
         start_index = state.file_index if state else 1
         start_position = state.position if state else 0.0
 
@@ -90,6 +99,11 @@ class PlayerService:
                 start_position=start_position,
             )
 
+            if result == "jump":
+                current_index, start_position = self._resolve_jump_target(files, files_by_index)
+                self._save_jump_position(book_id, current_index, start_position)
+                continue
+
             if result in {"completed", "next"}:
                 start_position = 0.0
                 current_index += 1
@@ -100,6 +114,19 @@ class PlayerService:
 
             else:
                 break
+
+    def get_volume(self) -> float | None:
+        player = self.context.current_player
+        if player is None:
+            return None
+        return self.mpv.get_volume(player)
+
+    def set_volume(self, level: float) -> None:
+        level = max(0.0, min(100.0, level))
+        player = self.context.current_player
+        if player is None:
+            return
+        self.mpv.set_volume(player, level)
 
     def _play_single_book_file(
         self,
@@ -118,6 +145,7 @@ class PlayerService:
                 file_index + 1,
                 0.0,
                 speed=self.context.playback_speed,
+                volume=self.context.playback_volume,
             )
 
             return "next"
@@ -142,6 +170,7 @@ class PlayerService:
             player.play(str(file_path))
             self.mpv.wait_until_loaded(player)
             self.mpv.set_speed(player, self.context.playback_speed)
+            self.mpv.set_volume(player, self.context.playback_volume)
 
             if start_position:
                 self.log(f"Resuming from {start_position:.2f} seconds...")
@@ -158,17 +187,27 @@ class PlayerService:
                 )
 
                 if self.context.skip_to_next:
-                    result = "next"
-                    self.playback_repository.save_position(
-                        book_id, file_index + 1, 0.0, speed=self.context.playback_speed
-                    )
+                    result = "jump" if self._has_jump_target() else "next"
+
+                    if result == "next":
+                        self.playback_repository.save_position(
+                            book_id,
+                            file_index + 1,
+                            0.0,
+                            speed=self.context.playback_speed,
+                            volume=self.context.playback_volume,
+                        )
                     break
 
                 if self.context.skip_to_previous:
                     result = "previous"
                     previous_index = max(1, file_index - 1)
                     self.playback_repository.save_position(
-                        book_id, previous_index, 0.0, speed=self.context.playback_speed
+                        book_id,
+                        previous_index,
+                        0.0,
+                        speed=self.context.playback_speed,
+                        volume=self.context.playback_volume,
                     )
                     break
 
@@ -176,14 +215,22 @@ class PlayerService:
                 if pos is not None:
                     self.context.last_position = pos
                     self.playback_repository.save_position(
-                        book_id, file_index, pos, speed=self.context.playback_speed
+                        book_id,
+                        file_index,
+                        pos,
+                        speed=self.context.playback_speed,
+                        volume=self.context.playback_volume,
                     )
 
                 if self.mpv.is_idle(player):
                     completed = True
                     result = "completed"
                     self.playback_repository.save_position(
-                        book_id, file_index + 1, 0.0, speed=self.context.playback_speed
+                        book_id,
+                        file_index + 1,
+                        0.0,
+                        speed=self.context.playback_speed,
+                        volume=self.context.playback_volume,
                     )
                     break
 
@@ -199,6 +246,7 @@ class PlayerService:
                     file_index,
                     self.context.last_position,
                     speed=self.context.playback_speed,
+                    volume=self.context.playback_volume,
                 )
 
             with self.context.player_lock:
@@ -212,3 +260,49 @@ class PlayerService:
                 pass
 
         return result
+
+    def _resolve_jump_target(
+        self,
+        files: list[BookFile],
+        files_by_index: dict[int, BookFile],
+    ) -> tuple[int, float]:
+        jump_index = self.context.jump_target_index
+        jump_position = self.context.jump_target_position
+
+        self.context.jump_target_index = None
+        self.context.jump_target_position = 0.0
+
+        if jump_index is not None and jump_index in files_by_index:
+            return jump_index, 0.0
+
+        return book_position_to_file_position(files, jump_position)
+
+    def _has_jump_target(self) -> bool:
+        return (
+            self.context.jump_target_index is not None
+            or self.context.jump_target_position > 0.0
+        )
+
+    def _save_jump_position(
+        self,
+        book_id: int,
+        file_index: int,
+        position: float,
+    ) -> None:
+        self.context.last_position = position
+        self.context.current_file_index = file_index
+        self.playback_repository.save_position(
+            book_id,
+            file_index,
+            position,
+            speed=self.context.playback_speed,
+        )
+
+    def jump_to_position(self, book_position: float) -> None:
+        self.actions.jump_to_position(book_position)
+
+    def jump_to_file(self, file_index: int, position: float = 0.0) -> None:
+        self.actions.jump_to_file(file_index, position)
+
+    def jump_to_bookmark(self, bookmark_id: int) -> None:
+        self.actions.jump_to_bookmark(bookmark_id)

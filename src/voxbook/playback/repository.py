@@ -24,6 +24,7 @@ class PlaybackRepository:
         file_index: int,
         position: float,
         speed: float,
+        volume: float = 100.0,
     ) -> None:
         with Session(engine) as session:
             state = session.get(BookPlaybackState, book_id)
@@ -34,12 +35,14 @@ class PlaybackRepository:
                     file_index=file_index,
                     position=position,
                     speed=speed,
+                    volume=volume,
                 )
                 session.add(state)
             else:
                 state.file_index = file_index
                 state.position = position
                 state.speed = speed
+                state.volume = volume
                 state.updated_at = datetime.now(timezone.utc)
 
             session.commit()

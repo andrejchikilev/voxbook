@@ -8,6 +8,9 @@ class ScannedBook:
     title: str
     path: Path
     files: list[Path]
+    author: str | None = None
+    series: str | None = None
+    narrator: str | None = None
 
 
 class ScanPattern(Protocol):
