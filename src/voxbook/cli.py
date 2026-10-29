@@ -7,9 +7,9 @@ from rich.table import Table
 from sqlmodel import Session, select
 
 from voxbook.helpers import book_position_to_file_position, format_seconds, parse_timestamp
-from voxbook.library.models import Book, BookFile
+from voxbook.library.models import Book, BookFile, LibraryRoot
 from voxbook.library.repository import delete_bookmark, get_bookmark, list_bookmarks
-from voxbook.library.scanner import scan_library
+from voxbook.library.scanner import rescan_libraries, scan_library
 from voxbook.playback.player_service import PlayerService
 from voxbook.playback.repository import PlaybackRepository
 from voxbook.storage.db import engine, get_db_path, init_db
@@ -68,6 +68,59 @@ def resume() -> None:
 def scan(path: Path) -> None:
     scan_library(path)
     console.print(f"Scanned directory: {escape(str(path))}")
+
+
+@app.command()
+def rescan() -> None:
+    saved_roots = rescan_libraries()
+
+    if not saved_roots:
+        console.print("[yellow]No library roots configured. Use `voxbook scan <path>`.[/yellow]")
+        raise typer.Exit()
+
+    for root in saved_roots:
+        console.print(f"Rescanned directory: {escape(str(root))}")
+
+
+@app.command()
+def roots(
+    remove: str | None = typer.Option(None, "--remove", "-r", help="Remove a library root path"),
+) -> None:
+    with Session(engine) as session:
+        if remove is not None:
+            normalized = str(Path(remove).expanduser().resolve())
+            existing = session.exec(
+                select(LibraryRoot).where(LibraryRoot.path == normalized)
+            ).first()
+
+            if existing is None:
+                console.print("[yellow]Library root not found[/yellow]")
+                raise typer.Exit(code=1)
+
+            session.delete(existing)
+            session.commit()
+            console.print(f"[green]Removed library root:[/green] {escape(normalized)}")
+            return
+
+        items = session.exec(select(LibraryRoot).order_by(LibraryRoot.added_at)).all()
+
+        if not items:
+            console.print("[yellow]No library roots configured[/yellow]")
+            return
+
+        table = Table(title="Library Roots")
+        table.add_column("ID", justify="right")
+        table.add_column("Path")
+        table.add_column("Added")
+
+        for item in items:
+            table.add_row(
+                str(item.id),
+                escape(item.path),
+                escape(item.added_at.strftime("%Y-%m-%d %H:%M:%S")),
+            )
+
+        console.print(table)
 
 
 @app.command()
