@@ -74,8 +74,9 @@ def rescan_libraries() -> list[Path]:
                     save_scanned_book(session, scanned_book)
 
         session.commit()
+        root_paths = [Path(root.path) for root in roots]
 
-    return [Path(root.path) for root in roots]
+    return root_paths
 
 
 def match_books(path: Path, patterns: list[ScanPattern]) -> list[ScannedBook]:
