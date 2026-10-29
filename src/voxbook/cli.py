@@ -12,9 +12,11 @@ from voxbook.helpers import book_position_to_file_position, format_seconds, pars
 from voxbook.library.models import Book, BookFile, LibraryRoot
 from voxbook.library.progress import book_progress, book_updated_at
 from voxbook.library.repository import (
+    BookMatcher,
     delete_bookmark,
     get_bookmark,
     list_bookmarks,
+    purge_books_matching,
 )
 from voxbook.library.repository import (
     remove_book as remove_book_from_library,
@@ -505,6 +507,95 @@ def reset_db(force: bool = typer.Option(False, "--force", "-f")) -> None:
     db_path.unlink()
 
     console.print("[red]Database deleted[/red]")
+
+
+def _glob_to_like(pattern: str) -> str:
+    """Translate a shell-style glob into a SQL LIKE pattern."""
+    return pattern.replace("*", "%")
+
+
+@app.command()
+def purge(
+    title_glob: str | None = typer.Option(
+        None,
+        "--title-glob",
+        help="Glob pattern to match against book titles (case-insensitive).",
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt."),
+) -> None:
+    """
+    Remove junk books matching the given pattern.
+
+    Always shows a dry-run preview first and asks for confirmation unless --yes
+    is used. Without --title-glob the command prints a usage hint and exits.
+    """
+    if title_glob is None:
+        console.print(
+            "[yellow]Use --title-glob <pattern> to choose which books to purge.[/yellow]\n"
+            "Example: voxbook purge --title-glob 'goto*'"
+        )
+        raise typer.Exit()
+
+    matcher = BookMatcher(title_ilike=_glob_to_like(title_glob))
+
+    with Session(engine) as session:
+        candidates = _load_purge_preview(session, matcher)
+
+    if not candidates:
+        console.print("[green]No matching books found.[/green]")
+        raise typer.Exit()
+
+    table = Table(title="Books to purge")
+    table.add_column("ID", justify="right")
+    table.add_column("Title")
+    table.add_column("Author")
+    table.add_column("Files", justify="right")
+
+    for book_id, title, author, file_count in candidates:
+        table.add_row(
+            str(book_id),
+            escape(title),
+            escape(author or "—"),
+            str(file_count),
+        )
+
+    console.print(table)
+
+    if not yes:
+        confirm = typer.confirm(
+            f"Delete {len(candidates)} book(s) and their related data?"
+        )
+        if not confirm:
+            console.print("[green]Cancelled[/green]")
+            raise typer.Exit()
+
+    summary = purge_books_matching(engine, [matcher])
+
+    console.print(
+        f"[red]Purged:[/red] {summary['books']} book(s), "
+        f"{summary['files']} file(s), "
+        f"{summary['bookmarks']} bookmark(s), "
+        f"{summary['progress_states']} progress state(s)"
+    )
+
+
+def _load_purge_preview(
+    session: Session,
+    matcher: BookMatcher,
+) -> list[tuple[int, str, str | None, int]]:
+    """Return a preview list of (id, title, author, file_count) for matching books."""
+    statement = select(Book)
+    statement = matcher.apply(statement)
+    books = list(session.exec(statement).all())
+
+    preview: list[tuple[int, str, str | None, int]] = []
+    for book in books:
+        assert book.id is not None
+        file_count = len(
+            list(session.exec(select(BookFile).where(BookFile.book_id == book.id)).all())
+        )
+        preview.append((book.id, book.title, book.author, file_count))
+    return preview
 
 
 @app.command("files")
