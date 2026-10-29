@@ -4,13 +4,25 @@ from natsort import natsorted
 from sqlmodel import Session, select
 
 from voxbook.library.helpers import get_audio_duration
-from voxbook.library.models import Book, BookFile
+from voxbook.library.models import Book, BookFile, LibraryRoot
 from voxbook.library.scan_patterns.base import ScannedBook, ScanPattern
 from voxbook.library.scan_patterns.book_folder_with_parts import BookFolderWithPartsPattern
 from voxbook.library.scan_patterns.flat_book_folder import FlatBookFolderPattern
 from voxbook.library.scan_patterns.nested_inherited_name import NestedInheritedNamePattern
 from voxbook.library.scan_patterns.single_file import SingleFilePattern
 from voxbook.storage.db import engine
+
+
+def _normalize_root(path: Path) -> Path:
+    return path.expanduser().resolve()
+
+
+def save_library_root(session: Session, root_path: Path) -> None:
+    normalized = _normalize_root(root_path)
+    existing = session.exec(select(LibraryRoot).where(LibraryRoot.path == str(normalized))).first()
+
+    if existing is None:
+        session.add(LibraryRoot(path=str(normalized)))
 
 
 def scan_library(library_root: Path) -> None:
@@ -27,6 +39,8 @@ def scan_library(library_root: Path) -> None:
     ]
 
     with Session(engine) as session:
+        save_library_root(session, library_root)
+
         for entry in natsorted(library_root.iterdir(), key=lambda p: p.name):
             scanned_books = match_books(entry, patterns)
 
@@ -34,6 +48,35 @@ def scan_library(library_root: Path) -> None:
                 save_scanned_book(session, scanned_book)
 
         session.commit()
+
+
+def rescan_libraries() -> list[Path]:
+    patterns: list[ScanPattern] = [
+        BookFolderWithPartsPattern(),
+        NestedInheritedNamePattern(),
+        FlatBookFolderPattern(),
+        SingleFilePattern(),
+    ]
+
+    with Session(engine) as session:
+        roots = session.exec(select(LibraryRoot).order_by(LibraryRoot.added_at)).all()
+
+        for root in roots:
+            root_path = Path(root.path)
+
+            if not root_path.exists():
+                continue
+
+            for entry in natsorted(root_path.iterdir(), key=lambda p: p.name):
+                scanned_books = match_books(entry, patterns)
+
+                for scanned_book in scanned_books:
+                    save_scanned_book(session, scanned_book)
+
+        session.commit()
+        root_paths = [Path(root.path) for root in roots]
+
+    return root_paths
 
 
 def match_books(path: Path, patterns: list[ScanPattern]) -> list[ScannedBook]:
@@ -46,13 +89,31 @@ def match_books(path: Path, patterns: list[ScanPattern]) -> list[ScannedBook]:
     return []
 
 
+def _infer_author_title(name: str) -> tuple[str | None, str]:
+    """Infer author/title from a folder or file name using ' - ' separator."""
+    if " - " in name:
+        author, title = name.split(" - ", 1)
+        return author.strip() or None, title.strip() or name
+
+    return None, name
+
+
 def save_scanned_book(session: Session, scanned_book: ScannedBook) -> None:
     book = session.exec(select(Book).where(Book.path == str(scanned_book.path))).first()
 
     if book is None:
+        author = scanned_book.author
+        title = scanned_book.title
+
+        if author is None:
+            author, title = _infer_author_title(scanned_book.title)
+
         book = Book(
-            title=scanned_book.title,
+            title=title,
             path=str(scanned_book.path),
+            author=author,
+            series=scanned_book.series,
+            narrator=scanned_book.narrator,
         )
         session.add(book)
         session.commit()

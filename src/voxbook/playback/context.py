@@ -19,6 +19,10 @@ class PlaybackContext:
         self.current_book_title: str | None = None
 
         self.playback_speed = 1.0
+        self.playback_volume = 100.0
+
+        self.jump_target_index: int | None = None
+        self.jump_target_position: float = 0.0
 
     def get_player(self) -> MPV | None:
         with self.player_lock:

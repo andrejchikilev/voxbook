@@ -1,10 +1,44 @@
+from __future__ import annotations
+
+import logging
+import shutil
 import time
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from mpv import MPV
 
+if TYPE_CHECKING:
+    from voxbook.config import AppConfig
+
+logger = logging.getLogger(__name__)
+
 
 class MpvController:
+    def __init__(self, config: AppConfig | None = None) -> None:
+        self.config = config
+
+    def _mpv_executable(self) -> str:
+        if self.config is None:
+            return "mpv"
+
+        mpv_path = self.config.mpv_path
+        if isinstance(mpv_path, Path):
+            return str(mpv_path)
+
+        expanded = Path(mpv_path).expanduser()
+        if expanded.exists():
+            return str(expanded)
+
+        found = shutil.which(mpv_path)
+        if found:
+            return found
+
+        return str(mpv_path)
+
     def create_player(self) -> MPV:
+        mpv_executable = self._mpv_executable()
+        self._ensure_mpv_available(mpv_executable)
         return MPV(
             ytdl=False,
             vid="no",
@@ -12,6 +46,14 @@ class MpvController:
             input_default_bindings=False,
             input_vo_keyboard=False,
         )
+
+    def _ensure_mpv_available(self, executable: str) -> None:
+        path = Path(executable)
+        if path.exists():
+            return
+        if shutil.which(executable) is not None:
+            return
+        logger.warning("mpv binary not found: %s", executable)
 
     def wait_until_loaded(self, player: MPV) -> None:
         for _ in range(50):
@@ -51,6 +93,18 @@ class MpvController:
     def set_speed(self, player: MPV, speed: float) -> None:
         try:
             player.speed = speed
+        except Exception:
+            pass
+
+    def get_volume(self, player: MPV) -> float | None:
+        try:
+            return player.volume
+        except Exception:
+            return None
+
+    def set_volume(self, player: MPV, level: float) -> None:
+        try:
+            player.volume = level
         except Exception:
             pass
 
