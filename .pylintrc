@@ -8,8 +8,10 @@ disable=
     too-many-positional-arguments,
     too-many-branches,
     too-many-statements,
-    broad-exception-caught,
-    redefined-outer-name
+    too-many-locals,
+    redefined-outer-name,
+    import-outside-toplevel,
+    broad-exception-caught
 
 [FORMAT]
 max-line-length=100
