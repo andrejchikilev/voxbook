@@ -7,6 +7,9 @@ class Book(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     title: str
     path: str = Field(unique=True)
+    author: str | None = None
+    series: str | None = None
+    narrator: str | None = None
 
 
 class BookFile(SQLModel, table=True):
