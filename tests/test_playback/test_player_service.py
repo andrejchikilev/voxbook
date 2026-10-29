@@ -32,6 +32,7 @@ def test_play_single_book_file_skips_invalid_file_without_starting_mpv(
         2,
         0.0,
         speed=1.0,
+        volume=100.0,
     )
 
 

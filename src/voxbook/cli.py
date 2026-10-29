@@ -364,6 +364,10 @@ def volume(
         console.print(f"[green]Volume:[/green] {current_volume:.0f}")
         return
 
+    if player_service.get_volume() is None:
+        console.print("[yellow]No active player[/yellow]")
+        raise typer.Exit(code=1)
+
     player_service.set_volume(level)
     console.print(f"[green]Volume set:[/green] {level:.0f}")
 

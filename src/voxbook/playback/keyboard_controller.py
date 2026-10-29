@@ -19,6 +19,8 @@ class KeyboardController:
         on_speed_up: Callable[[], None],
         on_speed_down: Callable[[], None],
         on_speed_reset: Callable[[], None],
+        on_volume_up: Callable[[], None],
+        on_volume_down: Callable[[], None],
     ) -> None:
         self.stop_event = stop_event
         self.on_quit = on_quit
@@ -32,6 +34,8 @@ class KeyboardController:
         self.on_speed_up = on_speed_up
         self.on_speed_down = on_speed_down
         self.on_speed_reset = on_speed_reset
+        self.on_volume_up = on_volume_up
+        self.on_volume_down = on_volume_down
 
     def run(self) -> None:
         while not self.stop_event.is_set():
@@ -65,3 +69,7 @@ class KeyboardController:
                 self.on_speed_down()
             elif key == "=":
                 self.on_speed_reset()
+            elif key == "]":
+                self.on_volume_up()
+            elif key == "[":
+                self.on_volume_down()
