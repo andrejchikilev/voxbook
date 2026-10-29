@@ -226,6 +226,49 @@ def delete_bookmark_command(
         raise typer.Exit(code=1)
 
 
+@app.command("book-info")
+def book_info(book_id: int) -> None:
+    with Session(engine) as session:
+        book = session.get(Book, book_id)
+
+        if book is None:
+            console.print("[red]Book not found[/red]")
+            raise typer.Exit(code=1)
+
+    console.print(f"[green]Book:[/green] {escape(book.title)}")
+    console.print(f"[green]Author:[/green] {escape(book.author or '—')}")
+    console.print(f"[green]Series:[/green] {escape(book.series or '—')}")
+    console.print(f"[green]Narrator:[/green] {escape(book.narrator or '—')}")
+    console.print(f"[green]Path:[/green] {escape(book.path)}")
+
+
+@app.command("set-book")
+def set_book(
+    book_id: int,
+    author: str | None = typer.Option(None, "--author"),
+    series: str | None = typer.Option(None, "--series"),
+    narrator: str | None = typer.Option(None, "--narrator"),
+) -> None:
+    with Session(engine) as session:
+        book = session.get(Book, book_id)
+
+        if book is None:
+            console.print("[red]Book not found[/red]")
+            raise typer.Exit(code=1)
+
+        if author is not None:
+            book.author = author
+        if series is not None:
+            book.series = series
+        if narrator is not None:
+            book.narrator = narrator
+
+        session.add(book)
+        session.commit()
+
+    console.print(f"[green]Updated book {book_id}[/green]")
+
+
 @app.command("set-speed")
 def set_speed(book_id: int, speed: float) -> None:
     if speed < 0.5 or speed > 3.0:
