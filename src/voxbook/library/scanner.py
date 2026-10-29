@@ -50,6 +50,34 @@ def scan_library(library_root: Path) -> None:
         session.commit()
 
 
+def rescan_libraries() -> list[Path]:
+    patterns: list[ScanPattern] = [
+        BookFolderWithPartsPattern(),
+        NestedInheritedNamePattern(),
+        FlatBookFolderPattern(),
+        SingleFilePattern(),
+    ]
+
+    with Session(engine) as session:
+        roots = session.exec(select(LibraryRoot).order_by(LibraryRoot.added_at)).all()
+
+        for root in roots:
+            root_path = Path(root.path)
+
+            if not root_path.exists():
+                continue
+
+            for entry in natsorted(root_path.iterdir(), key=lambda p: p.name):
+                scanned_books = match_books(entry, patterns)
+
+                for scanned_book in scanned_books:
+                    save_scanned_book(session, scanned_book)
+
+        session.commit()
+
+    return [Path(root.path) for root in roots]
+
+
 def match_books(path: Path, patterns: list[ScanPattern]) -> list[ScannedBook]:
     for pattern in patterns:
         scanned_books = pattern.match(path)
