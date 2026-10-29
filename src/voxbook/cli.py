@@ -6,13 +6,13 @@ from rich.markup import escape
 from rich.table import Table
 from sqlmodel import Session, select
 
-from voxbook.helpers import format_seconds
+from voxbook.helpers import book_position_to_file_position, format_seconds, parse_timestamp
 from voxbook.library.models import Book, BookFile
 from voxbook.library.repository import delete_bookmark, get_bookmark, list_bookmarks
 from voxbook.library.scanner import scan_library
 from voxbook.playback.player_service import PlayerService
 from voxbook.playback.repository import PlaybackRepository
-from voxbook.storage.db import DB_PATH, engine, init_db
+from voxbook.storage.db import engine, get_db_path, init_db
 
 app = typer.Typer()
 console = Console()
@@ -158,6 +158,49 @@ def bookmarks(book_id: int) -> None:
         console.print(f"{item.id}: file={item.file_index} | pos={format_seconds(item.position)}")
 
 
+@app.command()
+def goto(book_id: int, position: str) -> None:
+    with Session(engine) as session:
+        book = session.get(Book, book_id)
+
+        if book is None:
+            console.print("[red]Book not found[/red]")
+            raise typer.Exit(code=1)
+
+        book_files = session.exec(
+            select(BookFile).where(BookFile.book_id == book_id).order_by(BookFile.index)
+        ).all()
+
+    if not book_files:
+        console.print("[red]Book has no files[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        book_position = parse_timestamp(position)
+    except ValueError as error:
+        console.print(f"[red]Invalid position: {error}[/red]")
+        raise typer.Exit(code=1) from error
+
+    file_index, file_position = book_position_to_file_position(list(book_files), book_position)
+
+    existing_state = playback_repository.load_position(book_id)
+    saved_speed = existing_state.speed if existing_state else 1.0
+
+    playback_repository.save_position(
+        book_id=book_id,
+        file_index=file_index,
+        position=file_position,
+        speed=saved_speed,
+    )
+
+    console.print(
+        f"[green]Goto:[/green] {format_seconds(book_position)} "
+        f"(file {file_index}, pos {format_seconds(file_position)})"
+    )
+
+    play(book_id)
+
+
 @app.command("goto-bookmark")
 def goto_bookmark_command(bookmark_id: int) -> None:
     bookmark = get_bookmark(bookmark_id)
@@ -166,11 +209,14 @@ def goto_bookmark_command(bookmark_id: int) -> None:
         console.print("[red]Bookmark not found[/red]")
         raise typer.Exit(code=1)
 
+    existing_state = playback_repository.load_position(bookmark.book_id)
+    saved_speed = existing_state.speed if existing_state else 1.0
+
     playback_repository.save_position(
         book_id=bookmark.book_id,
         file_index=bookmark.file_index,
         position=bookmark.position,
-        speed=1.0,
+        speed=saved_speed,
     )
 
     console.print(
@@ -245,7 +291,9 @@ def reset_db(force: bool = typer.Option(False, "--force", "-f")) -> None:
     Delete the database file.
     """
 
-    if not DB_PATH.exists():
+    db_path = get_db_path()
+
+    if not db_path.exists():
         console.print("[yellow]Database does not exist[/yellow]")
         return
 
@@ -255,7 +303,7 @@ def reset_db(force: bool = typer.Option(False, "--force", "-f")) -> None:
             console.print("[green]Cancelled[/green]")
             raise typer.Exit()
 
-    DB_PATH.unlink()
+    db_path.unlink()
 
     console.print("[red]Database deleted[/red]")
 
