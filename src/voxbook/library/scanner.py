@@ -46,13 +46,31 @@ def match_books(path: Path, patterns: list[ScanPattern]) -> list[ScannedBook]:
     return []
 
 
+def _infer_author_title(name: str) -> tuple[str | None, str]:
+    """Infer author/title from a folder or file name using ' - ' separator."""
+    if " - " in name:
+        author, title = name.split(" - ", 1)
+        return author.strip() or None, title.strip() or name
+
+    return None, name
+
+
 def save_scanned_book(session: Session, scanned_book: ScannedBook) -> None:
     book = session.exec(select(Book).where(Book.path == str(scanned_book.path))).first()
 
     if book is None:
+        author = scanned_book.author
+        title = scanned_book.title
+
+        if author is None:
+            author, title = _infer_author_title(scanned_book.title)
+
         book = Book(
-            title=scanned_book.title,
+            title=title,
             path=str(scanned_book.path),
+            author=author,
+            series=scanned_book.series,
+            narrator=scanned_book.narrator,
         )
         session.add(book)
         session.commit()
