@@ -1,4 +1,6 @@
 """Tests for storage database."""
+import os
+from pathlib import Path
 from unittest.mock import patch
 
 from sqlalchemy import create_engine, text
@@ -64,6 +66,13 @@ class TestDatabase:
         """Test that engine is created with correct URL."""
         assert engine is not None
         assert "sqlite" in str(engine.url)
+
+    def test_pytest_engine_is_not_user_database(self):
+        """The default pytest engine must use the isolated test database."""
+        user_db_path = (Path.home() / ".local/share/voxbook/voxbook.db").resolve()
+        engine_db_path = Path(engine.url.database).resolve()
+        assert engine_db_path != user_db_path
+        assert engine_db_path == Path(os.environ["VOXBOOK_DB_PATH"]).resolve()
 
     def test_get_db_path_returns_path(self, monkeypatch, tmp_path):
         """Test get_db_path reflects config changes."""
