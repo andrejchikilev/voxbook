@@ -4,6 +4,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
+from sqlalchemy import or_
 from sqlmodel import Session, select
 
 from voxbook.helpers import format_seconds
@@ -72,9 +73,19 @@ def scan(path: Path) -> None:
 
 @app.command()
 def search(query: str) -> None:
+    pattern = f"%{query}%"
+
     with Session(engine) as session:
         books = session.exec(
-            select(Book).where(Book.title.ilike(f"%{query}%")).order_by(Book.title)
+            select(Book)
+            .where(
+                or_(
+                    Book.title.ilike(pattern),
+                    Book.author.ilike(pattern),
+                    Book.series.ilike(pattern),
+                )
+            )
+            .order_by(Book.title)
         ).all()
 
     if not books:
@@ -82,7 +93,9 @@ def search(query: str) -> None:
         return
 
     for book in books:
-        console.print(f"{book.id}: {escape(book.title)}")
+        author = book.author or "Unknown"
+        series_part = f" ({book.series})" if book.series else ""
+        console.print(f"{book.id}: {escape(author)} — {escape(book.title)}{escape(series_part)}")
 
 
 @app.command("list")
@@ -97,6 +110,7 @@ def list_books() -> None:
         table = Table(title="Library")
         table.add_column("ID", justify="right")
         table.add_column("Title")
+        table.add_column("Author")
         table.add_column("Progress")
         table.add_column("Position")
 
@@ -130,6 +144,7 @@ def list_books() -> None:
             table.add_row(
                 str(book.id),
                 escape(book.title),
+                escape(book.author or "—"),
                 progress_text,
                 position_text,
             )
