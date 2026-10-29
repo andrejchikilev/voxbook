@@ -5,6 +5,8 @@
 # ------------------------------------------------------------------
 from datetime import datetime, timezone
 
+from sqlalchemy import Engine
+from sqlalchemy import or_ as sqlalchemy_or
 from sqlmodel import Session, select
 
 from voxbook.library.models import Book, BookFile, Bookmark
@@ -102,3 +104,120 @@ def remove_book(book_id: int) -> tuple[bool, int, int, bool]:
         session.commit()
 
         return True, files_count, bookmarks_count, progress_removed
+
+
+class BookMatcher:
+    """Criterion for selecting books during a purge operation."""
+
+    def __init__(
+        self,
+        title_exact: str | None = None,
+        title_ilike: str | None = None,
+    ) -> None:
+        self.title_exact = title_exact
+        self.title_ilike = title_ilike
+
+    def apply(self, statement):
+        if self.title_exact is not None:
+            statement = statement.where(Book.title == self.title_exact)
+        if self.title_ilike is not None:
+            statement = statement.where(Book.title.ilike(self.title_ilike))
+        return statement
+
+
+def _is_real_listening_state(state: BookPlaybackState | None) -> bool:
+    """Return True if the state looks like genuine user progress."""
+    if state is None:
+        return False
+    return state.position > 0 or state.file_index > 1
+
+
+def is_purge_eligible(session: Session, book: Book) -> bool:
+    """Return whether a title-matching book passes the purge safety guards."""
+    if book.author or book.series or book.narrator:
+        return False
+    assert book.id is not None
+    return not _is_real_listening_state(session.get(BookPlaybackState, book.id))
+
+
+def purge_books_matching(
+    session_or_engine: Session | Engine,
+    matchers: list[BookMatcher],
+) -> dict[str, int]:
+    """
+    Delete books matching any of the supplied criteria and their related rows.
+
+    Safety guards:
+    - Books with any of author, series, or narrator set are never removed.
+    - Books with a playback state indicating real listening progress
+      (position > 0 or file_index > 1) are never removed.
+    - Matching is case-insensitive for ILIKE patterns.
+
+    Deletes every target in one transaction, in BookFile -> Bookmark ->
+    BookPlaybackState -> Book order, so a failure cannot leave a partial purge.
+
+    Returns a summary dict with keys: books, files, bookmarks, progress_states.
+    If no books match, returns all zeros and does not delete anything.
+    """
+    target_session: Session | None = None
+    own_session = False
+    if isinstance(session_or_engine, Engine):
+        target_session = Session(session_or_engine)
+        own_session = True
+    else:
+        target_session = session_or_engine
+
+    try:
+        candidates = _collect_purge_candidates(target_session, matchers)
+
+        books_removed = 0
+        files_removed = 0
+        bookmarks_removed = 0
+        progress_removed = 0
+
+        for book in candidates:
+            assert book.id is not None
+            if not is_purge_eligible(target_session, book):
+                continue
+
+            files = list(
+                target_session.exec(select(BookFile).where(BookFile.book_id == book.id)).all()
+            )
+            bookmarks = list(
+                target_session.exec(select(Bookmark).where(Bookmark.book_id == book.id)).all()
+            )
+            state = target_session.get(BookPlaybackState, book.id)
+            files_removed += len(files)
+            bookmarks_removed += len(bookmarks)
+            for row in files:
+                target_session.delete(row)
+            for row in bookmarks:
+                target_session.delete(row)
+            if state is not None:
+                target_session.delete(state)
+                progress_removed += 1
+            target_session.delete(book)
+            books_removed += 1
+
+        target_session.commit()
+
+        return {
+            "books": books_removed,
+            "files": files_removed,
+            "bookmarks": bookmarks_removed,
+            "progress_states": progress_removed,
+        }
+    finally:
+        if own_session and target_session is not None:
+            target_session.close()
+
+
+def _collect_purge_candidates(target_session: Session, matchers: list[BookMatcher]) -> list[Book]:
+    statement = select(Book)
+    if matchers:
+        conditions = []
+        for matcher in matchers:
+            id_statement = matcher.apply(select(Book.id))
+            conditions.append(Book.id.in_(id_statement))  # pylint: disable=no-member
+        statement = statement.where(sqlalchemy_or(*conditions))
+    return list(target_session.exec(statement).unique().all())
