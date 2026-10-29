@@ -8,7 +8,14 @@ from sqlmodel import Session, select
 
 from voxbook.helpers import format_seconds
 from voxbook.library.models import Book, BookFile
-from voxbook.library.repository import delete_bookmark, get_bookmark, list_bookmarks
+from voxbook.library.repository import (
+    delete_bookmark,
+    get_bookmark,
+    list_bookmarks,
+)
+from voxbook.library.repository import (
+    remove_book as remove_book_from_library,
+)
 from voxbook.library.scanner import scan_library
 from voxbook.playback.player_service import PlayerService
 from voxbook.playback.repository import PlaybackRepository
@@ -237,6 +244,48 @@ def set_speed(book_id: int, speed: float) -> None:
     )
 
     console.print(f"[green]Speed set:[/green] {speed:.1f}x")
+
+
+@app.command()
+def remove_book(
+    book_id: int,
+    force: bool = typer.Option(False, "--force", "-f"),
+) -> None:
+    with Session(engine) as session:
+        book = session.get(Book, book_id)
+
+        if book is None:
+            console.print("[red]Book not found[/red]")
+            raise typer.Exit(code=1)
+
+        book_files = session.exec(
+            select(BookFile).where(BookFile.book_id == book_id)
+        ).all()
+        file_count = len(book_files)
+        bookmark_count = len(list_bookmarks(book_id))
+
+    if not force:
+        confirm = typer.confirm(
+            f"Delete book '{book.title}' "
+            f"({file_count} files, {bookmark_count} bookmarks)?"
+        )
+        if not confirm:
+            console.print("[green]Cancelled[/green]")
+            raise typer.Exit()
+
+    result = remove_book_from_library(book_id)
+
+    if not result[0]:
+        console.print("[red]Book not found[/red]")
+        raise typer.Exit(code=1)
+
+    _, removed_files, removed_bookmarks, progress_removed = result
+
+    console.print(
+        f"[red]Deleted book[/red]: {escape(book.title)} "
+        f"({removed_files} files, {removed_bookmarks} bookmarks, "
+        f"progress {'reset' if progress_removed else 'was empty'})"
+    )
 
 
 @app.command("reset-db")

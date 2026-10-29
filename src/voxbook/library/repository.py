@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
-from voxbook.library.models import Bookmark
+from voxbook.library.models import Book, BookFile, Bookmark
+from voxbook.playback.models import BookPlaybackState
 from voxbook.storage.db import engine
 
 
@@ -57,3 +58,47 @@ def delete_bookmark(bookmark_id: int) -> bool:
         session.delete(bookmark)
         session.commit()
         return True
+
+
+def remove_book(book_id: int) -> tuple[bool, int, int, bool]:
+    """
+    Remove a book and its related rows in a single transaction.
+
+    Deletion order: BookFile -> Bookmark -> BookPlaybackState -> Book.
+    Returns a tuple of (removed, files_count, bookmarks_count, progress_removed).
+    If the book does not exist, returns (False, 0, 0, False) without deleting anything.
+
+    --keep-progress is intentionally not implemented: BookPlaybackState.book_id is
+    the primary key and references book.id, so keeping progress would leave an
+    orphaned row once the book is deleted.
+    """
+    with Session(engine) as session:
+        book = session.get(Book, book_id)
+        if book is None:
+            return False, 0, 0, False
+
+        files = list(
+            session.exec(select(BookFile).where(BookFile.book_id == book_id)).all()
+        )
+        bookmarks = list(
+            session.exec(select(Bookmark).where(Bookmark.book_id == book_id)).all()
+        )
+        state = session.get(BookPlaybackState, book_id)
+
+        files_count = len(files)
+        bookmarks_count = len(bookmarks)
+
+        for book_file in files:
+            session.delete(book_file)
+        for bookmark in bookmarks:
+            session.delete(bookmark)
+        if state is not None:
+            session.delete(state)
+            progress_removed = True
+        else:
+            progress_removed = False
+
+        session.delete(book)
+        session.commit()
+
+        return True, files_count, bookmarks_count, progress_removed

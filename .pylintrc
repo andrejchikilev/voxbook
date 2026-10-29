@@ -8,7 +8,8 @@ disable=
     too-many-positional-arguments,
     too-many-branches,
     too-many-statements,
-    broad-exception-caught
+    broad-exception-caught,
+    redefined-outer-name
 
 [FORMAT]
 max-line-length=100
