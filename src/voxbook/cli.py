@@ -44,8 +44,7 @@ def play(book_id: int) -> None:
     console.print(f"[green]Playing:[/green] {escape(book.title)}")
     console.print(
         "[dim]space: pause/play | ←/→: seek | n/p: next/prev file | "
-        "</>: speed | =: normal speed | s: status | b: bookmark | "
-        "g: goto time | j/k: goto file/bookmark | q: quit[/dim]"
+        "</>: speed | =: normal speed | s: status | b: bookmark | q: quit[/dim]"
     )
 
     player_service = PlayerService(
@@ -184,11 +183,14 @@ def goto(book_id: int, position: str) -> None:
 
     file_index, file_position = book_position_to_file_position(list(book_files), book_position)
 
+    existing_state = playback_repository.load_position(book_id)
+    saved_speed = existing_state.speed if existing_state else 1.0
+
     playback_repository.save_position(
         book_id=book_id,
         file_index=file_index,
         position=file_position,
-        speed=1.0,
+        speed=saved_speed,
     )
 
     console.print(
@@ -207,11 +209,14 @@ def goto_bookmark_command(bookmark_id: int) -> None:
         console.print("[red]Bookmark not found[/red]")
         raise typer.Exit(code=1)
 
+    existing_state = playback_repository.load_position(bookmark.book_id)
+    saved_speed = existing_state.speed if existing_state else 1.0
+
     playback_repository.save_position(
         book_id=bookmark.book_id,
         file_index=bookmark.file_index,
         position=bookmark.position,
-        speed=1.0,
+        speed=saved_speed,
     )
 
     console.print(

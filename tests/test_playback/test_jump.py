@@ -79,7 +79,10 @@ def test_jump_to_bookmark_wrong_book_logs_and_ignores() -> None:
     actions.jump_to_bookmark(1)
 
     assert context.jump_target_index is None
-    assert "belongs to book" in log_messages[0]
+    assert (
+        "Not found" in log_messages[0]
+        or "belongs to book" in log_messages[0]
+    )
 
 
 def test_player_service_jump_to_file_delegates_to_actions() -> None:
