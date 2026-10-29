@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import typer
 from rich.console import Console
@@ -8,6 +9,7 @@ from sqlmodel import Session, select
 
 from voxbook.helpers import format_seconds
 from voxbook.library.models import Book, BookFile
+from voxbook.library.progress import book_progress, book_updated_at
 from voxbook.library.repository import delete_bookmark, get_bookmark, list_bookmarks
 from voxbook.library.scanner import scan_library
 from voxbook.playback.player_service import PlayerService
@@ -17,6 +19,9 @@ from voxbook.storage.db import DB_PATH, engine, init_db
 app = typer.Typer()
 console = Console()
 playback_repository = PlaybackRepository()
+
+FilterStatus = Literal["not-started", "in-progress", "finished"]
+SortKey = Literal["title", "progress", "recent"]
 
 
 @app.callback()
@@ -85,10 +90,57 @@ def search(query: str) -> None:
         console.print(f"{book.id}: {escape(book.title)}")
 
 
+def _load_book_summary(session: Session, book: Book) -> dict:
+    book_files = session.exec(
+        select(BookFile).where(BookFile.book_id == book.id).order_by(BookFile.index)
+    ).all()
+    book_id = book.id
+    assert book_id is not None
+    state = playback_repository.load_position(book_id)
+    book_status, position, total = book_progress(list(book_files), state)
+    return {
+        "state": state,
+        "status": book_status,
+        "position": position,
+        "total": total,
+    }
+
+
+def _sort_books(books: list[Book], sort: SortKey, summaries: dict) -> None:
+    if sort == "title":
+        books.sort(key=lambda book: book.title)
+    elif sort == "progress":
+        books.sort(
+            key=lambda book: (
+                summaries[book.id]["position"] / summaries[book.id]["total"]
+                if summaries[book.id]["total"] > 0
+                else 0.0
+            ),
+            reverse=True,
+        )
+    elif sort == "recent":
+        books.sort(
+            key=lambda book: book_updated_at(summaries[book.id]["state"]),
+            reverse=True,
+        )
+
+
 @app.command("list")
-def list_books() -> None:
+def list_books(
+    filter_status: FilterStatus | None = typer.Option(
+        None, "--filter", "-f", help="Filter by status: not-started, in-progress, finished"
+    ),
+    sort: SortKey = typer.Option("title", "--sort", "-s", help="Sort by: title, progress, recent"),
+) -> None:
     with Session(engine) as session:
-        books = session.exec(select(Book).order_by(Book.title)).all()
+        books = list(session.exec(select(Book)).all())
+        summaries = {book.id: _load_book_summary(session, book) for book in books}
+
+        if filter_status:
+            target = filter_status.replace("-", " ")
+            books = [book for book in books if summaries[book.id]["status"] == target]
+
+        _sort_books(books, sort, summaries)
 
         if not books:
             console.print("[yellow]Library is empty[/yellow]")
@@ -97,39 +149,26 @@ def list_books() -> None:
         table = Table(title="Library")
         table.add_column("ID", justify="right")
         table.add_column("Title")
+        table.add_column("Status")
         table.add_column("Progress")
         table.add_column("Position")
 
         for book in books:
-            book_files = session.exec(
-                select(BookFile).where(BookFile.book_id == book.id).order_by(BookFile.index)
-            ).all()
+            summary = summaries[book.id]
+            position = summary["position"]
+            total = summary["total"]
 
-            state = playback_repository.load_position(book.id)
-
-            if not state or not book_files:
-                progress_text = "not started"
-                position_text = "-"
+            if total > 0:
+                progress_text = f"{position / total * 100:.1f}%"
+                position_text = f"{format_seconds(position)} / {format_seconds(total)}"
             else:
-                previous_duration = sum(
-                    book_file.duration
-                    for book_file in book_files
-                    if book_file.index < state.file_index
-                )
-
-                total_duration = sum(book_file.duration for book_file in book_files)
-                book_position = previous_duration + state.position
-
-                progress = book_position / total_duration * 100 if total_duration else 0
-
-                progress_text = f"{progress:.1f}%"
-                position_text = (
-                    f"{format_seconds(book_position)} / {format_seconds(total_duration)}"
-                )
+                progress_text = "-"
+                position_text = "-"
 
             table.add_row(
                 str(book.id),
                 escape(book.title),
+                summary["status"],
                 progress_text,
                 position_text,
             )
@@ -313,23 +352,19 @@ def status(book_id: int) -> None:
 
     console.print(f"[green]Book:[/green] {escape(book.title)}")
 
+    book_status, book_position, total_duration = book_progress(book_files, state)
+
+    console.print(f"[green]Status:[/green] {book_status}")
+
     if state is None:
-        console.print("[yellow]Progress:[/yellow] not started")
         return
+
+    console.print(f"[green]File:[/green] {state.file_index} / {len(book_files)}")
 
     current_file = next(
         (book_file for book_file in book_files if book_file.index == state.file_index),
         None,
     )
-
-    previous_duration = sum(
-        book_file.duration for book_file in book_files if book_file.index < state.file_index
-    )
-
-    total_duration = sum(book_file.duration for book_file in book_files)
-    book_position = previous_duration + state.position
-
-    console.print(f"[green]File:[/green] {state.file_index} / {len(book_files)}")
 
     console.print(
         f"[green]File position:[/green] "
