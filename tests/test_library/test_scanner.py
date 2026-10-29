@@ -2,8 +2,11 @@
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
+from voxbook.library.models import Book
 from voxbook.library.scan_patterns.base import ScannedBook
-from voxbook.library.scanner import match_books, save_scanned_book
+from voxbook.library.scanner import _infer_author_title, match_books, save_scanned_book
 
 
 class TestScanner:
@@ -47,6 +50,25 @@ class TestScanner:
         mock_pattern2.match.assert_called_once()
 
 
+class TestInferAuthorTitle:
+    """Tests for author/title inference heuristic."""
+
+    @pytest.mark.parametrize(
+        ("name", "expected_author", "expected_title"),
+        [
+            ("Author Name - Book Title", "Author Name", "Book Title"),
+            ("No Separator Here", None, "No Separator Here"),
+            (" - Title Only", None, "Title Only"),
+            ("Author -", None, "Author -"),
+        ],
+    )
+    def test_infer_author_title(self, name, expected_author, expected_title):
+        """Test that _infer_author_title splits names on ' - '."""
+        author, title = _infer_author_title(name)
+        assert author == expected_author
+        assert title == expected_title
+
+
 class TestSaveScannedBook:
     """Tests for save_scanned_book function."""
 
@@ -70,3 +92,25 @@ class TestSaveScannedBook:
 
         mock_session.add.assert_called()
         mock_session.commit.assert_called_once()
+
+    def test_save_scanned_book_infers_author_from_title(self, mock_session: Mock):
+        """Test that author is inferred when title contains ' - '."""
+        mock_session.exec.return_value.first.return_value = None
+        mock_session.exec.return_value.all.return_value = []
+
+        def mock_refresh(book):
+            book.id = 1
+        mock_session.refresh.side_effect = mock_refresh
+
+        scanned_book = ScannedBook(
+            path=Path("/test/author-title"),
+            title="Jane Doe - Some Book",
+            files=[]
+        )
+
+        save_scanned_book(mock_session, scanned_book)
+
+        added_book = mock_session.add.call_args[0][0]
+        assert isinstance(added_book, Book)
+        assert added_book.author == "Jane Doe"
+        assert added_book.title == "Some Book"
