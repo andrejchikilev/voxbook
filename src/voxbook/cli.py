@@ -15,6 +15,7 @@ from voxbook.library.repository import (
     BookMatcher,
     delete_bookmark,
     get_bookmark,
+    is_purge_eligible,
     list_bookmarks,
     purge_books_matching,
 )
@@ -584,9 +585,11 @@ def _load_purge_preview(
     matcher: BookMatcher,
 ) -> list[tuple[int, str, str | None, int]]:
     """Return a preview list of (id, title, author, file_count) for matching books."""
-    statement = select(Book)
-    statement = matcher.apply(statement)
-    books = list(session.exec(statement).all())
+    statement = matcher.apply(select(Book))
+    books = [
+        book for book in session.exec(statement).all()
+        if is_purge_eligible(session, book)
+    ]
 
     preview: list[tuple[int, str, str | None, int]] = []
     for book in books:
