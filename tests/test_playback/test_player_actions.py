@@ -1,77 +1,103 @@
+"""Tests for player actions."""
+from pathlib import Path
 from unittest.mock import Mock
 
+from voxbook.config import AppConfig
 from voxbook.playback.context import PlaybackContext
+from voxbook.playback.mpv_controller import MpvController
 from voxbook.playback.player_actions import PlayerActions
 from voxbook.playback.status_renderer import StatusRenderer
 
 
-def _make_player_actions():
+def _make_actions(
+    config: AppConfig | None = None,
+) -> tuple[PlayerActions, Mock, Mock, PlaybackContext]:
     context = PlaybackContext()
-    mpv = Mock()
-    renderer = Mock(spec=StatusRenderer)
-    log = Mock()
-
-    return PlayerActions(
+    mpv = Mock(spec=MpvController)
+    status_renderer = Mock(spec=StatusRenderer)
+    actions = PlayerActions(
         context=context,
-        log=log,
+        log=Mock(),
         mpv=mpv,
-        status_renderer=renderer,
+        status_renderer=status_renderer,
+        config=config,
     )
+    return actions, mpv, status_renderer, context
 
 
-def test_volume_up_increases_volume_and_calls_mpv():
-    actions = _make_player_actions()
-    actions.context.playback_volume = 60.0
-    player = Mock()
-    actions.context.current_player = player
+def test_seek_forward_uses_config_step() -> None:
+    """Test seek forward uses configured step value."""
+    config = AppConfig(
+        db_path=Path("/tmp/db"),
+        mpv_path="mpv",
+        seek_step_seconds=60,
+        speed_step=0.1,
+        speed_min=0.5,
+        speed_max=3.0,
+    )
+    actions, mpv, _, _ = _make_actions(config)
+    context = actions.context
+    context.current_player = Mock()
 
-    actions.volume_up()
+    actions.seek_forward()
 
-    assert actions.context.playback_volume == 65.0
-    actions.mpv.set_volume.assert_called_once_with(player, 65.0)
-
-
-def test_volume_down_decreases_volume_and_calls_mpv():
-    actions = _make_player_actions()
-    actions.context.playback_volume = 60.0
-    player = Mock()
-    actions.context.current_player = player
-
-    actions.volume_down()
-
-    assert actions.context.playback_volume == 55.0
-    actions.mpv.set_volume.assert_called_once_with(player, 55.0)
+    mpv.seek.assert_called_once_with(context.current_player, 60, reference="relative")
 
 
-def test_volume_up_clamps_to_maximum():
-    actions = _make_player_actions()
-    actions.context.playback_volume = 98.0
-    player = Mock()
-    actions.context.current_player = player
+def test_seek_backward_uses_config_step() -> None:
+    """Test seek backward uses configured step value."""
+    config = AppConfig(
+        db_path=Path("/tmp/db"),
+        mpv_path="mpv",
+        seek_step_seconds=45,
+        speed_step=0.1,
+        speed_min=0.5,
+        speed_max=3.0,
+    )
+    actions, mpv, _, _ = _make_actions(config)
+    context = actions.context
+    context.current_player = Mock()
 
-    actions.volume_up()
+    actions.seek_backward()
 
-    assert actions.context.playback_volume == 100.0
-    actions.mpv.set_volume.assert_called_once_with(player, 100.0)
-
-
-def test_volume_down_clamps_to_minimum():
-    actions = _make_player_actions()
-    actions.context.playback_volume = 2.0
-    player = Mock()
-    actions.context.current_player = player
-
-    actions.volume_down()
-
-    assert actions.context.playback_volume == 0.0
-    actions.mpv.set_volume.assert_called_once_with(player, 0.0)
+    mpv.seek.assert_called_once_with(context.current_player, -45, reference="relative")
 
 
-def test_volume_up_without_player_updates_context_only():
-    actions = _make_player_actions()
-    actions.context.playback_volume = 60.0
+def test_speed_up_respects_config_max_and_step() -> None:
+    """Test speed up uses configured max and step."""
+    config = AppConfig(
+        db_path=Path("/tmp/db"),
+        mpv_path="mpv",
+        seek_step_seconds=30,
+        speed_step=0.5,
+        speed_min=0.5,
+        speed_max=2.0,
+    )
+    actions, mpv, _, context = _make_actions(config)
+    context.current_player = Mock()
+    context.playback_speed = 1.0
 
-    actions.volume_up()
+    actions.speed_up()
 
-    assert actions.context.playback_volume == 65.0
-    actions.mpv.set_volume.assert_not_called()
+    assert context.playback_speed == 1.5
+    mpv.set_speed.assert_called_once_with(context.current_player, 1.5)
+
+
+def test_speed_down_respects_config_min_and_step() -> None:
+    """Test speed down uses configured min and step."""
+    config = AppConfig(
+        db_path=Path("/tmp/db"),
+        mpv_path="mpv",
+        seek_step_seconds=30,
+        speed_step=0.5,
+        speed_min=1.0,
+        speed_max=3.0,
+    )
+    actions, mpv, _, context = _make_actions(config)
+    context.current_player = Mock()
+    context.playback_speed = 1.5
+
+    actions.speed_down()
+
+    assert context.playback_speed == 1.0
+    mpv.set_speed.assert_called_once_with(context.current_player, 1.0)

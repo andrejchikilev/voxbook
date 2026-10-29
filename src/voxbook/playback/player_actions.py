@@ -1,5 +1,6 @@
 from mpv import MPV
 
+from voxbook.config import AppConfig, load_config
 from voxbook.helpers import format_seconds
 from voxbook.library.repository import create_bookmark
 from voxbook.playback.context import PlaybackContext
@@ -15,11 +16,13 @@ class PlayerActions:
         log: LogFn,
         mpv: MpvController,
         status_renderer: StatusRenderer,
+        config: AppConfig | None = None,
     ) -> None:
         self.context = context
         self.log = log
         self.mpv = mpv
         self.status_renderer = status_renderer
+        self.config = config or load_config()
 
     def quit(self) -> None:
         self.context.stop_event.set()
@@ -83,18 +86,20 @@ class PlayerActions:
     def seek_forward(self) -> None:
         player = self._get_current_player()
         if player is not None:
-            self.mpv.seek(player, 30, reference="relative")
+            self.mpv.seek(player, self.config.seek_step_seconds, reference="relative")
 
     def seek_backward(self) -> None:
         player = self._get_current_player()
         if player is not None:
-            self.mpv.seek(player, -15, reference="relative")
+            self.mpv.seek(player, -self.config.seek_step_seconds, reference="relative")
 
     def speed_up(self) -> None:
-        self.set_speed(min(3.0, self.context.playback_speed + 0.1))
+        target = self.context.playback_speed + self.config.speed_step
+        self.set_speed(min(self.config.speed_max, target))
 
     def speed_down(self) -> None:
-        self.set_speed(max(0.5, self.context.playback_speed - 0.1))
+        target = self.context.playback_speed - self.config.speed_step
+        self.set_speed(max(self.config.speed_min, target))
 
     def speed_reset(self) -> None:
         self.set_speed(1.0)

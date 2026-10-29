@@ -2,6 +2,7 @@ import threading
 import time
 from pathlib import Path
 
+from voxbook.config import AppConfig, load_config
 from voxbook.library.models import BookFile
 from voxbook.playback.context import PlaybackContext
 from voxbook.playback.exceptions import AudioFileValidationError
@@ -22,14 +23,16 @@ class PlayerService:
         mpv: MpvController | None = None,
         status_renderer: StatusRenderer | None = None,
         playback_repository: PlaybackRepository | None = None,
+        config: AppConfig | None = None,
     ) -> None:
         self.log = log or (lambda message: None)
+        self.config = config or load_config()
 
         # 1. Base state
         self.context = context or PlaybackContext()
 
         # 2. Then controllers that depend on the state
-        self.mpv = mpv or MpvController()
+        self.mpv = mpv or MpvController(config=self.config)
         self.status_renderer = status_renderer or StatusRenderer(log=self.log, mpv=self.mpv)
         self.playback_repository = playback_repository or PlaybackRepository()
 
@@ -39,6 +42,7 @@ class PlayerService:
             log=self.log,
             mpv=self.mpv,
             status_renderer=self.status_renderer,
+            config=self.config,
         )
 
         # 4. And only then keyboard
