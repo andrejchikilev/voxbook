@@ -19,3 +19,12 @@ wheels/
 
 # Local auxiliary documents
 local-docs/
+
+# Local tool configs and kanban worktrees
+opencode.jsonc
+.worktrees/
+
+# Databases and SQLite WAL sidecars
+*.db
+*.db-shm
+*.db-wal
