@@ -142,6 +142,17 @@ Supported variables:
 | `speed_min` | `VOXBOOK_SPEED_MIN` | `0.5` |
 | `speed_max` | `VOXBOOK_SPEED_MAX` | `3.0` |
 
+`mpv_path` is the path or command name of the `mpv` binary. VoxBook checks that the file exists or is available on `PATH` before playback and logs a warning if it cannot be found. This value is not passed to mpv as an option.
+
+For a disposable CLI database, set `VOXBOOK_DB_PATH` for that command:
+
+```sh
+VOXBOOK_DB_PATH=/tmp/voxbook-test.db uv run voxbook list
+```
+
+Use a different path for each manual test run if you want a fresh database. Pytest
+sets this variable automatically to an isolated temporary database for the whole run.
+
 ## ⚙️ Storage
 
 SQLite DB:
