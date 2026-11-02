@@ -24,6 +24,10 @@ def _build_engine() -> Engine:
 
 
 engine = _build_engine()
+_DB_PATH = _current_db_path()
+_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+engine = create_engine(f"sqlite:///{_DB_PATH}")
 
 
 def __getattr__(name: str) -> Path:
