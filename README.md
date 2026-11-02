@@ -2,6 +2,8 @@
 
 VoxBook is a CLI audiobook player with smart library scanning, playback state persistence, and flexible folder structure support.
 
+**Version:** 0.2.0
+
 > Repository: https://github.com/andrejchikilev/voxbook
 
 ## ✨ Features
@@ -19,18 +21,14 @@ VoxBook is a CLI audiobook player with smart library scanning, playback state pe
 
 ## 📋 Requirements
 
-VoxBook depends on the following tools:
+VoxBook requires Python 3.14 or later and [`uv`](https://github.com/astral-sh/uv), a Python package and environment manager. Install `mpv` for audiobook playback.
 
-### Python environment
-
-- [`uv`](https://github.com/astral-sh/uv) — fast Python package manager and virtualenv tool
-
-Install `uv`:
+Install `uv` with `pip`:
 
 ```bash
 pip install uv
 ```
-or (recommended):
+Or use the installer (recommended):
 
 ```bash
 curl -Ls https://astral.sh/uv/install.sh | sh
@@ -41,10 +39,8 @@ curl -Ls https://astral.sh/uv/install.sh | sh
 ## 📦 Installation
 
 ```bash
-git clone git@github.com:andrejchikilev/voxbook.git
+git clone https://github.com/andrejchikilev/voxbook.git
 cd voxbook
-
-uv venv
 uv sync
 ```
 
@@ -58,45 +54,64 @@ sudo apt install mpv
 
 ## 🚀 Usage
 
-### Scan library
+### Manage libraries
 
 ```bash
 voxbook scan ~/Audiobooks
+voxbook rescan
+voxbook roots
+voxbook roots --remove ~/Audiobooks
 ```
 
-### List books
+`scan` adds and scans a directory. `rescan` scans all configured roots. `roots` lists configured roots; use `--remove` to remove one.
+
+### Find and inspect books
 
 ```bash
 voxbook list
+voxbook list --filter in-progress --sort recent
+voxbook search "author or title"
+voxbook book-info <book_id>
+voxbook files <book_id>
+voxbook status <book_id>
 ```
 
-### Play book
+`list` accepts `--filter not-started|in-progress|finished` and `--sort title|progress|recent`.
+
+### Playback and progress
 
 ```bash
 voxbook play <book_id>
-```
-
-### Resume last book
-
-```bash
 voxbook resume
+voxbook goto <book_id> 1:23:45
+voxbook set-speed <book_id> 1.25
+voxbook volume 60
 ```
 
-### Bookmarks
+`goto` accepts a position in seconds, `minutes:seconds`, or `hours:minutes:seconds`. `volume` shows or changes the volume of the active player (0–100).
+`set-speed` accepts values from 0.5 to 3.0.
+
+### Bookmarks and metadata
 
 ```bash
 voxbook bookmarks <book_id>
 voxbook goto-bookmark <bookmark_id>
 voxbook delete-bookmark <bookmark_id>
+voxbook set-book <book_id> --author "Author" --series "Series" --narrator "Narrator"
 ```
 
-### Reset progress
+### Remove data
 
 ```bash
 voxbook reset-progress <book_id>
+voxbook remove-book <book_id>
+voxbook purge --title-glob 'Sample*'
+voxbook reset-db
 ```
 
----
+`reset-progress`, `remove-book`, and `reset-db` ask for confirmation by default; add `--force` to skip confirmation. `purge` previews matching books and asks for confirmation; use `--yes` to skip it. `reset-db` deletes the database and all library data.
+
+Run `voxbook --help` or `voxbook <command> --help` for the complete command and option reference.
 
 ## 🎧 Playback controls
 
@@ -109,11 +124,11 @@ voxbook reset-progress <book_id>
 | > | increase speed |
 | < | decrease speed |
 | = | reset speed |
+| ] | increase volume |
+| [ | decrease volume |
 | s | show status |
 | b | bookmark |
 | q | quit |
-
----
 
 ## ⚙️ Configuration
 
@@ -153,20 +168,9 @@ VOXBOOK_DB_PATH=/tmp/voxbook-test.db uv run voxbook list
 Use a different path for each manual test run if you want a fresh database. Pytest
 sets this variable automatically to an isolated temporary database for the whole run.
 
-=======
-## ⚙️ Storage
-
-SQLite DB:
-
-```
-~/.local/share/voxbook/voxbook.db
-```
----
-
 ## 🚧 TODO
 
 - TUI interface
-- Volume control
 - Chapter support
 - Sync
 - Smarter scanning
