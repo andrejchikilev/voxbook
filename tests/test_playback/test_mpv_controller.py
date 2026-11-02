@@ -171,10 +171,12 @@ def test_create_player_with_real_mpv_no_location() -> None:
     from mpv import MPV
 
     player = MPV(
-        ytdl=False,
-        vid="no",
-        audio_display="no",
-        input_default_bindings=False,
-        input_vo_keyboard=False,
+        **{
+            "ytdl": False,
+            "vid": "no",
+            "audio_display": "no",
+            "input_default_bindings": False,
+            "input_vo_keyboard": False,
+        }
     )
     player.terminate()

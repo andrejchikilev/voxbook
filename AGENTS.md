@@ -28,3 +28,6 @@
 - Ruff config only enforces `E`, `F`, and `I`; line length is `100`, quote style is double quotes.
 - Pre-commit runs end-of-file/trailing-whitespace hooks, Ruff with `--fix`, and Pylint on changed Python files.
 - Pylint intentionally disables missing docstrings and several complexity warnings; don’t add docstrings just to satisfy Pylint.
+
+## OpenCode Project Configuration
+- When adding an entry to this project's `opencode.jsonc`, prefix its name with `voxbook-` (for example, name the SQLite MCP server `voxbook-sqlite`).

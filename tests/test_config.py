@@ -9,6 +9,7 @@ class TestConfig:
 
     def test_default_values(self, monkeypatch, tmp_path):
         """Test default configuration values."""
+        monkeypatch.delenv("VOXBOOK_DB_PATH", raising=False)
         monkeypatch.setenv("HOME", str(tmp_path))
         config = load_config(Path("/nonexistent/config.toml"))
 
@@ -19,8 +20,9 @@ class TestConfig:
         assert config.speed_min == 0.5
         assert config.speed_max == 3.0
 
-    def test_load_from_toml(self, tmp_path):
+    def test_load_from_toml(self, monkeypatch, tmp_path):
         """Test loading configuration from TOML file."""
+        monkeypatch.delenv("VOXBOOK_DB_PATH", raising=False)
         config_path = tmp_path / "config.toml"
         config_path.write_text(
             'db_path = "/tmp/voxbook.db"\n'
@@ -67,6 +69,7 @@ class TestConfig:
 
     def test_default_config_path(self, monkeypatch, tmp_path):
         """Test loading from default config path."""
+        monkeypatch.delenv("VOXBOOK_DB_PATH", raising=False)
         config_dir = tmp_path / ".config/voxbook"
         config_dir.mkdir(parents=True)
         config_path = config_dir / "config.toml"
@@ -80,6 +83,7 @@ class TestConfig:
 
     def test_tilde_expansion(self, monkeypatch, tmp_path):
         """Test tilde expansion in paths."""
+        monkeypatch.delenv("VOXBOOK_DB_PATH", raising=False)
         monkeypatch.setenv("HOME", str(tmp_path))
         config_path = tmp_path / "config.toml"
         config_path.write_text('db_path = "~/custom/voxbook.db"\n')
