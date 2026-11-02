@@ -10,10 +10,20 @@ def _current_db_path() -> Path:
     return load_config().db_path
 
 
-_DB_PATH = _current_db_path()
-_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+def _make_engine_url(db_path: Path) -> str:
+    return f"sqlite:///{db_path}"
 
-engine = create_engine(f"sqlite:///{_DB_PATH}")
+
+def _create_engine_for_path(db_path: Path) -> Engine:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return create_engine(_make_engine_url(db_path))
+
+
+def _build_engine() -> Engine:
+    return _create_engine_for_path(_current_db_path())
+
+
+engine = _build_engine()
 
 
 def __getattr__(name: str) -> Path:
