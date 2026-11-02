@@ -29,3 +29,6 @@ opencode.jsonc
 *.db-shm
 *.db-wal
 =======
+
+# Local agent artifacts (ephemeral; do not commit)
+.agent-artifacts/

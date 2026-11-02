@@ -29,5 +29,11 @@
 - Pre-commit runs end-of-file/trailing-whitespace hooks, Ruff with `--fix`, and Pylint on changed Python files.
 - Pylint intentionally disables missing docstrings and several complexity warnings; don’t add docstrings just to satisfy Pylint.
 
+## Branch And Pull Request Conventions
+- Name branches `<type>/<task-id>-<short-kebab-summary>` using lowercase; use `fix/`, `feat/`, `docs/`, `refactor/`, `chore/`, or `test/` as appropriate. Omit `<task-id>-` only when the task has no stable ID. Example: `fix/vb-8-playback-status-line`.
+- Use PR titles in the form `<type>(<TASK-ID>): <imperative summary>` when a task ID exists, for example `fix(VB-8): redraw playback status in place`.
+- Use `.github/pull_request_template.md`. Describe the user-visible problem and outcome, summarize scoped changes, list verification commands with actual results, note manual checks or limitations, and link related issues without implying they will be closed unless closure was explicitly requested.
+- Write PR titles and descriptions in English. Never claim checks or manual verification that were not performed.
+
 ## OpenCode Project Configuration
 - When adding an entry to this project's `opencode.jsonc`, prefix its name with `voxbook-` (for example, name the SQLite MCP server `voxbook-sqlite`).
