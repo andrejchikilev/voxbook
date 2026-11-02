@@ -153,6 +153,7 @@ VOXBOOK_DB_PATH=/tmp/voxbook-test.db uv run voxbook list
 Use a different path for each manual test run if you want a fresh database. Pytest
 sets this variable automatically to an isolated temporary database for the whole run.
 
+=======
 ## ⚙️ Storage
 
 SQLite DB:
