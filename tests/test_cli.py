@@ -9,6 +9,37 @@ from voxbook.library.models import Book
 runner = CliRunner()
 
 
+def test_root_help_lists_descriptions_for_all_commands() -> None:
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    descriptions = [
+        "Play a book by its library ID.",
+        "Resume playback from the last saved position.",
+        "Add and scan a library directory.",
+        "Rescan configured library directories.",
+        "List or remove library directories.",
+        "Search books by title, author, or series.",
+        "List books with optional filters and sorting.",
+        "List a book's saved bookmarks.",
+        "Play from a timestamp in the book.",
+        "Play from a saved bookmark ID.",
+        "Delete a saved bookmark by ID.",
+        "Show book metadata and path.",
+        "Update a book's metadata.",
+        "Set a book's playback speed.",
+        "Remove a book and its library data.",
+        "Delete the database and all library data.",
+        "Remove junk books matching the given pattern.",
+        "List a book's audio files.",
+        "Show a book's playback position and progress.",
+        "Show or set active player volume (0–100).",
+        "Reset saved playback progress for a book.",
+    ]
+    for description in descriptions:
+        assert description in result.output
+
+
 def test_volume_get_with_active_player() -> None:
     with patch("voxbook.cli.PlayerService") as mock_service_class:
         service = Mock()

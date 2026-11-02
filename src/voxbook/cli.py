@@ -42,6 +42,7 @@ def main() -> None:
 
 @app.command()
 def play(book_id: int) -> None:
+    """Play a book by its library ID."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
@@ -71,6 +72,7 @@ def play(book_id: int) -> None:
 
 @app.command()
 def resume() -> None:
+    """Resume playback from the last saved position."""
     state = playback_repository.load_last_position()
 
     if state is None:
@@ -82,12 +84,14 @@ def resume() -> None:
 
 @app.command()
 def scan(path: Path) -> None:
+    """Add and scan a library directory."""
     scan_library(path)
     console.print(f"Scanned directory: {escape(str(path))}")
 
 
 @app.command()
 def rescan() -> None:
+    """Rescan configured library directories."""
     saved_roots = rescan_libraries()
 
     if not saved_roots:
@@ -102,6 +106,7 @@ def rescan() -> None:
 def roots(
     remove: str | None = typer.Option(None, "--remove", "-r", help="Remove a library root path"),
 ) -> None:
+    """List or remove library directories."""
     with Session(engine) as session:
         if remove is not None:
             normalized = str(Path(remove).expanduser().resolve())
@@ -141,6 +146,7 @@ def roots(
 
 @app.command()
 def search(query: str) -> None:
+    """Search books by title, author, or series."""
     pattern = f"%{query}%"
 
     with Session(engine) as session:
@@ -208,6 +214,7 @@ def list_books(
     ),
     sort: SortKey = typer.Option("title", "--sort", "-s", help="Sort by: title, progress, recent"),
 ) -> None:
+    """List books with optional filters and sorting."""
     with Session(engine) as session:
         books = list(session.exec(select(Book)).all())
         summaries = {book.id: _load_book_summary(session, book) for book in books}
@@ -256,6 +263,7 @@ def list_books(
 
 @app.command()
 def bookmarks(book_id: int) -> None:
+    """List a book's saved bookmarks."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
@@ -277,6 +285,7 @@ def bookmarks(book_id: int) -> None:
 
 @app.command()
 def goto(book_id: int, position: str) -> None:
+    """Play from a timestamp in the book."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
@@ -320,6 +329,7 @@ def goto(book_id: int, position: str) -> None:
 
 @app.command("goto-bookmark")
 def goto_bookmark_command(bookmark_id: int) -> None:
+    """Play from a saved bookmark ID."""
     bookmark = get_bookmark(bookmark_id)
 
     if bookmark is None:
@@ -350,6 +360,7 @@ def delete_bookmark_command(
     bookmark_id: int,
     force: bool = typer.Option(False, "--force", "-f"),
 ) -> None:
+    """Delete a saved bookmark by ID."""
     bookmark = get_bookmark(bookmark_id)
 
     if bookmark is None:
@@ -376,6 +387,7 @@ def delete_bookmark_command(
 
 @app.command("book-info")
 def book_info(book_id: int) -> None:
+    """Show book metadata and path."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
@@ -397,6 +409,7 @@ def set_book(
     series: str | None = typer.Option(None, "--series"),
     narrator: str | None = typer.Option(None, "--narrator"),
 ) -> None:
+    """Update a book's metadata."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
@@ -419,6 +432,7 @@ def set_book(
 
 @app.command("set-speed")
 def set_speed(book_id: int, speed: float) -> None:
+    """Set a book's playback speed."""
     if speed < 0.5 or speed > 3.0:
         console.print("[red]Speed must be between 0.5 and 3.0[/red]")
         raise typer.Exit(code=1)
@@ -450,6 +464,7 @@ def remove_book(
     book_id: int,
     force: bool = typer.Option(False, "--force", "-f"),
 ) -> None:
+    """Remove a book and its library data."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
@@ -489,9 +504,7 @@ def remove_book(
 
 @app.command("reset-db")
 def reset_db(force: bool = typer.Option(False, "--force", "-f")) -> None:
-    """
-    Delete the database file.
-    """
+    """Delete the database and all library data."""
 
     db_path = get_db_path()
 
@@ -603,6 +616,7 @@ def _load_purge_preview(
 
 @app.command("files")
 def list_files(book_id: int) -> None:
+    """List a book's audio files."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
@@ -635,6 +649,7 @@ def list_files(book_id: int) -> None:
 
 @app.command()
 def status(book_id: int) -> None:
+    """Show a book's playback position and progress."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
@@ -689,6 +704,7 @@ def status(book_id: int) -> None:
 def volume(
     level: float | None = typer.Argument(None, min=0.0, max=100.0),
 ) -> None:
+    """Show or set active player volume (0–100)."""
     player_service = PlayerService()
 
     if level is None:
@@ -714,6 +730,7 @@ def reset_progress(
     book_id: int,
     force: bool = typer.Option(False, "--force", "-f"),
 ) -> None:
+    """Reset saved playback progress for a book."""
     with Session(engine) as session:
         book = session.get(Book, book_id)
 
