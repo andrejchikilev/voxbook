@@ -35,5 +35,9 @@
 - Use `.github/pull_request_template.md`. Describe the user-visible problem and outcome, summarize scoped changes, list verification commands with actual results, note manual checks or limitations, and link related issues without implying they will be closed unless closure was explicitly requested.
 - Write PR titles and descriptions in English. Never claim checks or manual verification that were not performed.
 
+## GitHub Issue Drafts
+- Save unpublished issue drafts under `.agent-artifacts/tasks/drafts/`; do not invent a task ID before the issue is created, since its final ID is assigned by GitHub.
+- Keep the draft until the issue is successfully published, then delete the draft artifact.
+
 ## OpenCode Project Configuration
 - When adding an entry to this project's `opencode.jsonc`, prefix its name with `voxbook-` (for example, name the SQLite MCP server `voxbook-sqlite`).
