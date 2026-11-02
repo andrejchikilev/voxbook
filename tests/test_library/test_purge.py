@@ -17,16 +17,19 @@ runner = CliRunner()
 def in_memory_engine():
     """Create an isolated in-memory SQLite engine."""
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-    SQLModel.metadata.create_all(engine)
+    SQLModel.metadata.create_all(bind=engine)
     return engine
 
 
 @pytest.fixture
 def db_session(in_memory_engine):
     """Yield a session bound to the isolated engine and roll it back after each test."""
-    with Session(in_memory_engine) as session:
+    session = Session(bind=in_memory_engine)
+    try:
         yield session
+    finally:
         session.rollback()
+        session.close()
 
 
 def _add_book(session, title, author=None, series=None, narrator=None):
