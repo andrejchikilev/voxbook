@@ -32,7 +32,8 @@
 ## Branch And Pull Request Conventions
 - Name branches `<type>/<task-id>-<short-kebab-summary>` using lowercase; use `fix/`, `feat/`, `docs/`, `refactor/`, `chore/`, or `test/` as appropriate. Omit `<task-id>-` only when the task has no stable ID. Example: `fix/vb-8-playback-status-line`.
 - Use PR titles in the form `<type>(<TASK-ID>): <imperative summary>` when a task ID exists, for example `fix(VB-8): redraw playback status in place`.
-- Use `.github/pull_request_template.md`. Describe the user-visible problem and outcome, summarize scoped changes, list verification commands with actual results, note manual checks or limitations, and link related issues without implying they will be closed unless closure was explicitly requested.
+- Use `.github/pull_request_template.md`. Describe the user-visible problem and outcome, summarize scoped changes, list verification commands with actual results, and note manual checks or limitations.
+- For issue-backed PRs that complete the issue, use a closing reference such as `Closes #N` by default so GitHub closes the issue on merge. Use `Related to #N` only when the PR does not complete the issue or the issue should remain open; clarify when that intent is ambiguous.
 - Write PR titles and descriptions in English. Never claim checks or manual verification that were not performed.
 
 ## GitHub Issue Drafts

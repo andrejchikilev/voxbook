@@ -17,5 +17,5 @@
 
 ## Related issues
 
-<!-- Link related issues without closing them implicitly. -->
-<!-- Example: Related to #123 -->
+<!-- For an issue this PR completes, use a closing reference by default, e.g. "Closes #123". -->
+<!-- Use "Related to #123" only if the issue should remain open or this PR is partial. -->
